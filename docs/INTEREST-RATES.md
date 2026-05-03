@@ -58,3 +58,52 @@ borrowRate  = normalRate + (excessUtil * slope2) / RAY
 - Реализация использует **WAD/RAY** арифметику и, при необходимости, **FixedPoint** для согласованного масштабирования с yield (harvest).
 
 Конкретные формулы индекса и расчёта текущего долга см. в контракте Engine и библиотеке FixedPoint.
+
+---
+
+## 3 готовых пресета для запуска
+
+Ниже примерные стартовые наборы. Для mainnet обычно начинают с консервативного и расширяют лимиты по мере стабильной работы.
+
+### 1) Conservative launch
+
+- **LTV**: 70%
+- **Liq. Threshold**: 78%
+- **Liq. Penalty**: 8%
+- **Base Rate**: 1.0% APR
+- **Slope 1**: 8.0% APR
+- **Kink**: 80%
+- **Slope 2**: 60.0% APR
+- **Reserve Factor**: 15%
+- **Origination Fee**: 0.20%
+- **Borrow Cap**: 200,000
+- **Supply Cap**: 400,000
+
+### 2) Balanced
+
+- **LTV**: 75%
+- **Liq. Threshold**: 82%
+- **Liq. Penalty**: 7%
+- **Base Rate**: 1.0% APR
+- **Slope 1**: 10.0% APR
+- **Kink**: 80%
+- **Slope 2**: 70.0% APR
+- **Reserve Factor**: 12%
+- **Origination Fee**: 0.10%
+- **Borrow Cap**: 1,000,000
+- **Supply Cap**: 2,000,000
+
+### 3) Growth / aggressive
+
+- **LTV**: 80%
+- **Liq. Threshold**: 85%
+- **Liq. Penalty**: 6%
+- **Base Rate**: 0.5% APR
+- **Slope 1**: 12.0% APR
+- **Kink**: 85%
+- **Slope 2**: 90.0% APR
+- **Reserve Factor**: 10%
+- **Origination Fee**: 0.05%
+- **Borrow Cap**: 5,000,000
+- **Supply Cap**: 10,000,000
+

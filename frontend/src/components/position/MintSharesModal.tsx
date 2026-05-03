@@ -5,6 +5,9 @@ import { X, ArrowRight, CheckCircle, AlertCircle, Loader2, Coins } from 'lucide-
 import { erc20Abi, erc4626Abi } from '../../abi/ceitnotEngine';
 import { gasFor, gasForTokenApprove, TARGET_CHAIN_ID } from '../../lib/contracts';
 
+/** Lido bridged wstETH on Arbitrum One — Rabby/MetaMask «WSTETH» in the wallet. */
+const WSTETH_LIDO_ARB = '0x5979D7b546E38E414F7E9822514be443A4800529' as Address;
+
 type Props = {
   open:      boolean;
   onClose:   () => void;
@@ -65,28 +68,56 @@ export default function MintSharesModal({ open, onClose, onSuccess, vaultAddress
   const needsApproval = amountRaw > 0n && allowance < amountRaw;
 
   /**
-   * Mint-кнопка только там, где underlying — тестовый MockERC20 (есть публичный mint).
-   * Раньше для всего Arbitrum (42161) показывали mock — из‑за этого real Lido wstETH выглядел как тест.
+   * Показывать «наминть тестовые токены» только когда адрес актива явно указан как mock в env
+   * и совпадает с vault.underlying (Sepolia/Mainnet одинаково — без blanket true для тестсетей).
+   * Локальные чейны — для Anvil/mock-деплоя удобно оставить mint всегда.
+   * Canonical Lido wstETH на Arbitrum One никогда не считается mock.
    */
   const showMockMint = (() => {
     if (!assetAddress) return false;
     const assetLc = assetAddress.toLowerCase();
-    if (TARGET_CHAIN_ID === 31337 || TARGET_CHAIN_ID === 1337 || TARGET_CHAIN_ID === 11155111 || TARGET_CHAIN_ID === 421614)
-      return true;
+    if (TARGET_CHAIN_ID === 31337 || TARGET_CHAIN_ID === 1337) return true;
+
+    const mockEnv = (
+      (import.meta.env.VITE_MOCK_WSTETH_ADDRESS as string | undefined) ||
+      (import.meta.env.VITE_MOCK_WSTETH as string | undefined)
+    )
+      ?.toLowerCase()
+      .trim();
 
     if (TARGET_CHAIN_ID === 42161) {
       const canonicalWstEth = '0x5979d7b546e38e414f7e9822514be443a4800529';
       if (assetLc === canonicalWstEth) return false;
-      const mockEnv = (
-        (import.meta.env.VITE_MOCK_WSTETH_ADDRESS as string | undefined) ||
-        (import.meta.env.VITE_MOCK_WSTETH as string | undefined)
-      )
-        ?.toLowerCase()
-        .trim();
       return !!mockEnv && assetLc === mockEnv;
     }
-    return false;
+
+    return !!mockEnv && assetLc === mockEnv;
   })();
+
+  const loadedAssetSymbol = (tokenData?.[2]?.result as string | undefined) ?? undefined;
+  const vaultUsesOtherWstEthThanWallet =
+    open &&
+    TARGET_CHAIN_ID === 42161 &&
+    !!assetAddress &&
+    !!address &&
+    loadedAssetSymbol != null &&
+    /^wsteth$/i.test(loadedAssetSymbol.trim()) &&
+    assetAddress.toLowerCase() !== WSTETH_LIDO_ARB.toLowerCase();
+
+  const { data: lidoBalData } = useReadContracts({
+    contracts:
+      address && vaultUsesOtherWstEthThanWallet
+        ? [
+            { address: WSTETH_LIDO_ARB, abi: erc20Abi, functionName: 'balanceOf' as const, args: [address] as const, chainId: TARGET_CHAIN_ID },
+            { address: WSTETH_LIDO_ARB, abi: erc20Abi, functionName: 'decimals' as const, chainId: TARGET_CHAIN_ID },
+          ]
+        : [],
+    query: { enabled: !!address && vaultUsesOtherWstEthThanWallet },
+  });
+  const lidoWalletBalance = (lidoBalData?.[0]?.result as bigint | undefined) ?? 0n;
+  const lidoDecRaw = lidoBalData?.[1]?.result as number | bigint | undefined;
+  const lidoDecimals = typeof lidoDecRaw === 'bigint' ? Number(lidoDecRaw) : (lidoDecRaw ?? 18);
+
   const [mintTxHash, setMintTxHash] = useState<Hash | undefined>();
   const [mintError, setMintError] = useState('');
   const { isSuccess: mintConfirmed } = useWaitForTransactionReceipt({ hash: mintTxHash });
@@ -122,6 +153,11 @@ export default function MintSharesModal({ open, onClose, onSuccess, vaultAddress
 
   async function submit() {
     if (!address || !assetAddress) return;
+    if (marketBlockedForDeposit) {
+      setStep('error');
+      setErrMsg('Этот рынок использует другой контракт wstETH, не Lido 0x5979…; депозит через этот экран отключён.');
+      return;
+    }
     if (chainId !== TARGET_CHAIN_ID) {
       setStep('error');
       setErrMsg(
@@ -188,15 +224,27 @@ export default function MintSharesModal({ open, onClose, onSuccess, vaultAddress
   }
 
   if (!open) return null;
+  const marketBlockedForDeposit = vaultUsesOtherWstEthThanWallet;
 
   const isPending = step === 'approving' || step === 'depositing';
+  const assetAddressShort = assetAddress
+    ? `${assetAddress.slice(0, 6)}…${assetAddress.slice(-4)}`
+    : '';
+  const assetDisplaySymbol = vaultUsesOtherWstEthThanWallet && assetAddressShort
+    ? `${assetSymbol} (${assetAddressShort})`
+    : assetSymbol;
+  const assetBalanceLabel = vaultUsesOtherWstEthThanWallet
+    ? `${assetSymbol} balance (vault asset)`
+    : `${assetSymbol} balance`;
   const buttonLabel = step === 'approving'
     ? 'Approving…'
     : step === 'depositing'
     ? 'Depositing…'
+    : marketBlockedForDeposit
+    ? 'Disabled: market uses non‑Lido wstETH'
     : needsApproval
-    ? `Approve ${assetSymbol}`
-    : `Deposit ${assetSymbol} → Get ${vaultSymbol} Shares`;
+    ? `Approve ${assetDisplaySymbol}`
+    : `Deposit ${assetDisplaySymbol} → Get ${vaultSymbol} Shares`;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -246,12 +294,43 @@ export default function MintSharesModal({ open, onClose, onSuccess, vaultAddress
               </p>
             )}
 
+            {vaultUsesOtherWstEthThanWallet && assetAddress && (
+              <div className="mb-4 p-4 rounded-xl border-2 border-ceitnot-danger/70 bg-ceitnot-danger/10">
+                <p className="text-sm font-semibold text-ceitnot-danger mb-2 flex items-center gap-2">
+                  <AlertCircle size={18} />
+                  Это не тот wstETH, что в вашем кошельке
+                </p>
+                <p className="text-xs text-ceitnot-muted leading-relaxed mb-3">
+                  Рынок <span className="font-mono">#{marketId}</span> принимает underlying{' '}
+                  <span className="font-mono break-all text-ceitnot-ink">{assetAddress}</span>.
+                  Bridged&nbsp;Lido WSTETH в Rabby живёт по другому контракту:{' '}
+                  <span className="font-mono text-[10px] break-all text-ceitnot-ink">{WSTETH_LIDO_ARB}</span>.
+                  Баланс в форме — только по активу этого vault; большие суммы здесь почти всегда тестовый mint другого контракта с тем же тикером «wstETH».
+                </p>
+                <div className="text-xs p-3 rounded-lg bg-ceitnot-surface border border-ceitnot-border">
+                  <p className="text-ceitnot-muted">Ваш баланс Lido WSTETH на Arbitrum (тот же токен, что в Rabby)</p>
+                  <p className="font-mono text-sm font-semibold text-ceitnot-ink mt-1">
+                    {formatUnits(lidoWalletBalance, lidoDecimals)} WSTETH
+                  </p>
+                </div>
+                <p className="text-[11px] text-ceitnot-muted mt-3 leading-relaxed">
+                  Чтобы использовать эту wstETH в Ceitnot, в протоколе должен быть зарегистрирован рынок, чей vault считает underlying именно контракт Lido{' '}
+                  <span className="font-mono text-[10px] break-all">{WSTETH_LIDO_ARB}</span> (отдельный деплой / governance).
+                </p>
+              </div>
+            )}
+
             {/* Explanation */}
             <div className="mb-5 p-3 bg-ceitnot-gold/5 border border-ceitnot-gold/10 rounded-xl">
               <p className="text-xs text-ceitnot-muted">
                 To deposit collateral, you first need <strong className="text-ceitnot-ink">vault shares</strong>.
-                Enter the amount of <strong className="text-ceitnot-ink">{assetSymbol}</strong> to convert into
+                Enter the amount of <strong className="text-ceitnot-ink">{assetDisplaySymbol}</strong> to convert into
                 {' '}<strong className="text-ceitnot-ink">{vaultSymbol}</strong> shares.
+              </p>
+              <p className="text-[11px] text-ceitnot-muted/90 mt-2 pt-2 border-t border-ceitnot-gold/15 leading-relaxed">
+                The <span className="font-mono text-ceitnot-ink">{vaultSymbol}</span> ticker is whatever this market’s ERC-4626
+                vault returns from <span className="font-mono text-[10px]">ERC20.symbol()</span> on-chain — the UI reads it live; it is
+                not CoinGecko “branding”.
               </p>
             </div>
 
@@ -260,7 +339,7 @@ export default function MintSharesModal({ open, onClose, onSuccess, vaultAddress
               <div className="flex items-center gap-2 mb-4 p-3 bg-ceitnot-warning/10 border border-ceitnot-warning/20 rounded-xl">
                 <ArrowRight size={14} className="text-ceitnot-warning shrink-0" />
                 <p className="text-xs text-ceitnot-warning">
-                  Step 1: Approve {assetSymbol} for the vault. Step 2: Deposit.
+                  Step 1: Approve {assetDisplaySymbol} for the vault. Step 2: Deposit.
                 </p>
               </div>
             )}
@@ -273,7 +352,7 @@ export default function MintSharesModal({ open, onClose, onSuccess, vaultAddress
             {/* Amount */}
             <div className="mb-4">
               <label className="block text-sm text-ceitnot-muted mb-2">
-                Amount of {assetSymbol}
+                Amount of {assetDisplaySymbol}
               </label>
               <div className="flex gap-2">
                 <input
@@ -299,7 +378,7 @@ export default function MintSharesModal({ open, onClose, onSuccess, vaultAddress
             {/* Balances */}
             <div className="grid grid-cols-2 gap-3 mb-5 text-xs">
               <div className="p-3 bg-ceitnot-surface-2/80 rounded-xl">
-                <p className="text-ceitnot-muted">{assetSymbol} balance</p>
+                <p className="text-ceitnot-muted">{assetBalanceLabel}</p>
                 <p className="text-ceitnot-ink font-mono mt-1">{formatUnits(assetBalance, assetDecimals)}</p>
               </div>
               <div className="p-3 bg-ceitnot-surface-2/80 rounded-xl">
@@ -345,12 +424,18 @@ export default function MintSharesModal({ open, onClose, onSuccess, vaultAddress
             )}
 
             {/* Submit */}
+            {marketBlockedForDeposit && (
+              <p className="text-xs text-ceitnot-danger mb-2 text-center">
+                Депозит отключён: этот market не совместим с вашим Lido WSTETH в кошельке.
+              </p>
+            )}
             <button
               type="button"
               onClick={submit}
               disabled={
                 isPending
                 || chainMismatch
+                || marketBlockedForDeposit
                 || !amountRaw
                 || amountRaw <= 0n
                 || amountRaw > assetBalance
@@ -363,7 +448,7 @@ export default function MintSharesModal({ open, onClose, onSuccess, vaultAddress
 
             {amountRaw > assetBalance && assetBalance > 0n && (
               <p className="text-xs text-ceitnot-danger mt-2 text-center">
-                Amount exceeds your {assetSymbol} balance.
+                Amount exceeds your {assetDisplaySymbol} balance.
               </p>
             )}
 

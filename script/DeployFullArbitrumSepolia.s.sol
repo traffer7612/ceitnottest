@@ -44,7 +44,8 @@ contract MockChainlinkV3Feed {
         view
         returns (uint80, int256, uint256, uint256, uint80)
     {
-        return (1, answer, 0, updatedAt, 1);
+        // Use block timestamp so OracleRelay's 24h staleness check never bricks public testnet UIs.
+        return (1, answer, 0, block.timestamp, 1);
     }
 
     function decimals() external view returns (uint8) { return dec; }

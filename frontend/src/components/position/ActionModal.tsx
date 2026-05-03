@@ -1,10 +1,13 @@
 import { useState, useEffect } from 'react';
-import { useAccount, useWriteContract, useWaitForTransactionReceipt, useReadContracts } from 'wagmi';
+import { useAccount, useWriteContract, useWaitForTransactionReceipt, useReadContracts, useReadContract } from 'wagmi';
 import { parseUnits, formatUnits, type Hash, type Address } from 'viem';
 import { X, ArrowRight, CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
 import { ceitnotEngineAbi, erc20Abi, erc4626Abi } from '../../abi/ceitnotEngine';
 import { useContractAddresses, gasFor, TARGET_CHAIN_ID } from '../../lib/contracts';
+import { useMarkets } from '../../hooks/useMarkets';
 import { erc20Decimals, formatToken } from '../../lib/utils';
+import OracleRelayRefreshRow from './OracleRelayRefreshRow';
+import { oracleRelayPrimaryAbi } from '../../abi/testnetOracle';
 import { formatWriteContractError, hintForEngineError } from '../../lib/formatWriteError';
 
 export type ActionType = 'deposit' | 'withdraw' | 'borrow' | 'repay';
@@ -45,6 +48,8 @@ export default function ActionModal({
 }: Props) {
   const { address, chainId, isConnected } = useAccount();
   const { engine } = useContractAddresses();
+  const { markets } = useMarkets();
+  const marketOracle = markets.find(m => m.id === marketId)?.config.oracle;
   /** Env `VITE_*` addresses are only valid on this chain — always read balances/allowance here (not the wallet’s current chain). */
   const readChainId = TARGET_CHAIN_ID;
   const chainMismatch = isConnected && chainId != null && chainId !== TARGET_CHAIN_ID;
@@ -115,14 +120,30 @@ export default function ActionModal({
   });
   const assetSymbol = (assetSymbolData?.[0]?.result as string | undefined) ?? 'ASSET';
 
+  /** Stale OracleRelay (mock Chainlink older than 24h) reverts engine views and withdrawals; wallets often show "no ETH for gas" on failed estimate. */
+  const oracleProbeEnabled =
+    !!marketOracle
+    && TARGET_CHAIN_ID === 421614
+    && (action === 'borrow' || action === 'withdraw');
+  const { isError: oraclePriceFailed, refetch: refetchOraclePrice } = useReadContract({
+    address: (marketOracle ?? '0x0000000000000000000000000000000000000000') as Address,
+    abi: oracleRelayPrimaryAbi,
+    functionName: 'getLatestPrice',
+    chainId: readChainId,
+    query: { enabled: oracleProbeEnabled },
+  });
+
   // Read collateral value for borrow max calculation
-  const { data: posValueData } = useReadContracts({
+  const { data: posValueData, refetch: refetchCollateralValue } = useReadContracts({
     contracts: engine && address ? [
       { address: engine, abi: ceitnotEngineAbi, functionName: 'getPositionCollateralValue' as const, args: [address, BigInt(marketId)] as const, chainId: readChainId },
     ] : [],
     query: { enabled: !!engine && !!address && action === 'borrow' },
   });
-  const collateralValue = (posValueData?.[0]?.result as bigint | undefined) ?? 0n;
+  const posValueRead = posValueData?.[0];
+  const collateralValue =
+    posValueRead?.status === 'success' ? (posValueRead.result as bigint) : 0n;
+  const collateralPriceReadFailed = posValueRead?.status === 'failure';
   const borrowMaxRaw = (collateralValue * 8000n) / 10000n > (debtBalance ?? 0n)
     ? (collateralValue * 8000n) / 10000n - (debtBalance ?? 0n)
     : 0n;
@@ -428,6 +449,45 @@ export default function ActionModal({
                   Borrow power is effectively dust for this market. Current max: {formatUnits(borrowMaxRaw, debtDecimals)} {debtSymbol}. This usually indicates market collateral value is returned in a lower decimal scale on-chain; engine upgrade is required to unlock normal borrow size.
                 </p>
               )}
+              {action === 'borrow'
+                && TARGET_CHAIN_ID === 421614
+                && marketOracle
+                && (sharesBalance ?? 0n) > 0n
+                && (collateralValue === 0n || collateralPriceReadFailed || oraclePriceFailed) && (
+                  <div className="mt-2 p-3 rounded-xl bg-ceitnot-warning/10 border border-ceitnot-warning/25">
+                    <p className="text-xs text-ceitnot-muted mb-2">
+                      Collateral shares are deposited but the price read failed or returned zero — usual on Sepolia when the mock Chainlink feed is older than 24h.
+                    </p>
+                    <p className="text-xs text-ceitnot-muted mb-2">
+                      If the wallet says there is no ETH for gas, top up Arbitrum Sepolia ETH — or the tx simulation may be reverting for the same oracle reason.
+                    </p>
+                    <OracleRelayRefreshRow
+                      oracleAddress={marketOracle}
+                      onRefreshed={() => {
+                        void refetchCollateralValue();
+                        void refetchOraclePrice();
+                      }}
+                    />
+                  </div>
+                )}
+              {action === 'withdraw'
+                && TARGET_CHAIN_ID === 421614
+                && marketOracle
+                && (sharesBalance ?? 0n) > 0n
+                && oraclePriceFailed && (
+                  <div className="mt-2 p-3 rounded-xl bg-ceitnot-warning/10 border border-ceitnot-warning/25">
+                    <p className="text-xs text-ceitnot-muted mb-2">
+                      Oracle read failed (often stale mock Chainlink). Withdraw runs health checks that need a live price — MetaMask may show “unavailable ETH” when gas estimation hits a revert.
+                    </p>
+                    <p className="text-xs text-ceitnot-muted mb-2">
+                      Refresh the feed below, or ensure you have Arbitrum Sepolia ETH for gas.
+                    </p>
+                    <OracleRelayRefreshRow
+                      oracleAddress={marketOracle}
+                      onRefreshed={() => void refetchOraclePrice()}
+                    />
+                  </div>
+                )}
               {action === 'repay' && debtBalance !== undefined && debtBalance > 0n && (
                 <p className="text-xs text-ceitnot-muted mt-1">
                   Outstanding debt: <span className="text-ceitnot-ink font-mono">{formatUnits(debtBalance, debtDecimals)}</span>

@@ -1,5 +1,9 @@
 # Ceitnot Documentation (GitBook / docs.ceitnot.finance)
 
+## Старт
+
+- [Introduction to Ceitnot (ecosystem overview)](INTRODUCTION.md)
+
 ## Протокол
 
 - [Математика процентных ставок](INTEREST-RATES.md)

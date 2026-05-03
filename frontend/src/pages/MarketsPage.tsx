@@ -7,9 +7,11 @@ import { TrendingUp, RefreshCw } from 'lucide-react';
 function MarketCard({ market }: { market: ReturnType<typeof useMarkets>['markets'][number] }) {
   const { id, config, totalDebt, totalCollateral, vaultSymbol } = market;
 
-  const utilPct = config.borrowCap > 0n
+  /** Share of market borrow cap used. When cap is 0 = unlimited, there is no percentage — do not show 0% (misleading). */
+  const capUnlimited = config.borrowCap === 0n;
+  const utilPct = !capUnlimited
     ? Number((totalDebt * 10000n) / config.borrowCap) / 100
-    : 0;
+    : null;
 
   return (
     <div className="card p-0 overflow-hidden hover:border-ceitnot-border-2 transition-all group">
@@ -36,19 +38,25 @@ function MarketCard({ market }: { market: ReturnType<typeof useMarkets>['markets
         </div>
       </div>
 
-      {/* Borrow utilization bar */}
+      {/* Borrow cap utilization (debt / borrowCap); not LTV and not “pool” utilization */}
       <div className="px-5 py-3 border-b border-ceitnot-border">
         <div className="flex justify-between text-xs text-ceitnot-muted mb-1.5">
-          <span>Borrow utilization</span>
-          <span className="font-mono text-ceitnot-ink">{utilPct.toFixed(1)}%</span>
+          <span title="Outstanding market debt as a share of the borrow cap. If the cap is unlimited, no percentage applies.">
+            Borrow cap usage
+          </span>
+          <span className="font-mono text-ceitnot-ink">
+            {capUnlimited ? '— (no cap)' : `${utilPct!.toFixed(1)}%`}
+          </span>
         </div>
         <div className="h-1.5 bg-ceitnot-border rounded-full overflow-hidden">
-          <div
-            className={`h-full rounded-full transition-all ${
-              utilPct > 90 ? 'bg-ceitnot-danger' : utilPct > 70 ? 'bg-ceitnot-warning' : 'bg-ceitnot-gold'
-            }`}
-            style={{ width: `${Math.min(100, utilPct)}%` }}
-          />
+          {!capUnlimited && (
+            <div
+              className={`h-full rounded-full transition-all ${
+                utilPct! > 90 ? 'bg-ceitnot-danger' : utilPct! > 70 ? 'bg-ceitnot-warning' : 'bg-ceitnot-gold'
+              }`}
+              style={{ width: `${Math.min(100, utilPct!)}%` }}
+            />
+          )}
         </div>
       </div>
 

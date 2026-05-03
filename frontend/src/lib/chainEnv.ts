@@ -22,6 +22,19 @@ export function viteAddressLegacy(primary: string | undefined, legacy: string | 
  * Comma-separated market IDs to hide from dashboard / markets list / market picker (e.g. legacy broken oracle on testnet).
  * Users who still have collateral in a hidden market will still see that market in the picker and position cards.
  */
+/** 8-decimal Chainlink-style USD price for mock ETH/USD (default 3000e8). Used when refreshing the Sepolia mock feed from the UI. */
+export function viteMockEthUsd8Dec(): bigint {
+  const raw = import.meta.env.VITE_MOCK_ETH_USD_8DEC;
+  if (typeof raw === 'string' && raw.trim()) {
+    try {
+      return BigInt(raw.trim());
+    } catch {
+      /* fall through */
+    }
+  }
+  return 3000n * 10n ** 8n;
+}
+
 export function hiddenMarketIds(): Set<number> {
   const raw = import.meta.env.VITE_HIDDEN_MARKET_IDS;
   if (typeof raw !== 'string' || !raw.trim()) return new Set();

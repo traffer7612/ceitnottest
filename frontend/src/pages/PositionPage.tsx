@@ -7,6 +7,7 @@ import { useAdmin } from '../hooks/useAdmin';
 import { formatWad, formatToken, formatHf, parseHf, hfColor, hfBarColor, hfBarPct, formatAddress } from '../lib/utils';
 import ActionModal, { type ActionType } from '../components/position/ActionModal';
 import MintSharesModal from '../components/position/MintSharesModal';
+import TestnetOracleRefreshBar from '../components/position/TestnetOracleRefreshBar';
 import { Wallet, RefreshCw, PlusCircle, MinusCircle, ArrowUpCircle, ArrowDownCircle, Coins, ChevronDown } from 'lucide-react';
 
 type ModalState = { open: true; action: ActionType; marketId: number } | { open: false };
@@ -133,6 +134,8 @@ export default function PositionPage() {
           )}
         </div>
       )}
+
+      <TestnetOracleRefreshBar markets={markets} positions={positions} onRefreshed={refetch} />
 
       {/* Global Health Factor */}
       <div className="card p-5 mb-6">

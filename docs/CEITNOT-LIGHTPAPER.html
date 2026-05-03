@@ -1,0 +1,834 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Ceitnot Protocol — Lightpaper (EN)</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --ink: #12141a;
+      --muted: #5e6470;
+      --soft: #8b91a0;
+      --line: #e8eaef;
+      --bg: #f7f8f9;
+      --card: #ffffff;
+      --forest: #1e3d32;
+      --forest2: #2a5244;
+      --amber: #c9a227;
+      --amber2: #f0e0a8;
+      --blush: #faf0e8;
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      font-family: "DM Sans", system-ui, sans-serif;
+      font-size: 11pt;
+      line-height: 1.62;
+      color: var(--ink);
+      background: var(--bg);
+    }
+    .sheet {
+      max-width: 720px;
+      margin: 0 auto;
+      background: var(--card);
+      box-shadow: 0 2px 24px rgba(20, 24, 32, 0.04);
+      border: 1px solid rgba(0, 0, 0, 0.04);
+    }
+    @media print {
+      body { background: white; }
+      .sheet { box-shadow: none; max-width: 100%; }
+      .no-print { display: none !important; }
+      a[href] { color: var(--ink); text-decoration: none; }
+      h2 { break-after: avoid; }
+      .figure > svg {
+        transform: none !important;
+        box-shadow: none !important;
+        cursor: default !important;
+        transition: none !important;
+      }
+    }
+    .band {
+      background: linear-gradient(160deg, var(--forest) 0%, #152e28 55%, #0f2420 100%);
+      color: #f5f0e6;
+      padding: 2.5rem 2rem 2.2rem;
+      position: relative;
+      overflow: hidden;
+    }
+    .band-figure {
+      position: absolute; right: 0.5rem; bottom: 0.3rem; opacity: 0.35; pointer-events: none;
+    }
+    @media (max-width: 640px) { .band-figure { display: none; } }
+    .band::after {
+      content: "";
+      position: absolute; right: -20%; top: 10%;
+      width: 300px; height: 300px;
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 50%;
+      pointer-events: none;
+    }
+    .eyebrow {
+      font-size: 0.7rem;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: var(--amber2);
+      font-weight: 600;
+    }
+    h1 {
+      font-family: "Instrument Serif", Georgia, serif;
+      font-size: 2.75rem;
+      font-weight: 400;
+      margin: 0.35rem 0 0.4rem;
+      line-height: 1.08;
+    }
+    .subtitle { font-size: 1.05rem; color: #c8d4cc; max-width: 38rem; line-height: 1.55; }
+    .inner { padding: 0 2rem 2.6rem; }
+    .print-hint {
+      background: #fff4e0;
+      border: 1px solid #e8c97a;
+      border-radius: 8px;
+      padding: 0.65rem 1rem;
+      font-size: 0.86rem;
+      margin: 1rem 2rem 0;
+    }
+    .toc {
+      background: #f3f5f7;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 1rem 1.1rem 1.15rem;
+      margin: 1.3rem 0 0;
+      columns: 2;
+      column-gap: 1.5rem;
+    }
+    @media (max-width: 600px) { .toc { columns: 1; } }
+    .toc h2 { font-size: 0.75rem; margin: 0 0 0.5rem; color: var(--soft); text-transform: uppercase; letter-spacing: 0.08em; }
+    .toc ol { margin: 0; padding-left: 1.1rem; }
+    .toc li { margin: 0.25rem 0; font-size: 0.92rem; }
+    .toc a { color: var(--forest2); text-decoration: none; border-bottom: 1px dotted rgba(30, 61, 50, 0.35); }
+    h2 {
+      font-family: "Instrument Serif", Georgia, serif;
+      font-size: 1.48rem;
+      font-weight: 400;
+      color: var(--forest);
+      margin: 1.9rem 0 0.65rem;
+    }
+    h2 .num { color: var(--amber); font-size: 0.95em; margin-right: 0.25rem; }
+    h3 { font-size: 1.02rem; margin: 1.15rem 0 0.5rem; color: var(--ink); font-weight: 600; }
+    p { margin: 0.5rem 0; }
+    ul, ol { margin: 0.4rem 0; padding-left: 1.2rem; }
+    li { margin: 0.28rem 0; }
+    .lead { font-size: 1.04rem; color: var(--muted); }
+    .gloss-grid { display: grid; gap: 0.45rem; margin: 0.5rem 0; }
+    .gloss-item {
+      border-left: 3px solid var(--amber2);
+      padding: 0.45rem 0 0.45rem 0.75rem;
+      background: #fafbfc;
+    }
+    .gloss-item strong { color: var(--forest); display: block; margin-bottom: 0.15rem; }
+    .gloss-item span { color: var(--muted); font-size: 0.95rem; }
+    .steps { counter-reset: s; }
+    .step { position: relative; padding: 0.45rem 0 0.55rem 2.45rem; border-bottom: 1px solid var(--line); }
+    .step:last-child { border-bottom: 0; }
+    .step::before {
+      counter-increment: s; content: counter(s);
+      position: absolute; left: 0; top: 0.5rem;
+      width: 1.55rem; height: 1.55rem; border-radius: 50%;
+      background: var(--forest);
+      color: #fff; font-size: 0.76rem; font-weight: 700;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .box {
+      background: linear-gradient(180deg, #f8f9fb 0%, #fff 100%);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 0.85rem 1rem;
+      margin: 0.7rem 0;
+    }
+    .box-title { font-weight: 600; color: var(--forest); font-size: 0.9rem; margin: 0 0 0.4rem; }
+    .callout { background: var(--blush); border-radius: 8px; padding: 0.7rem 0.9rem; margin: 0.6rem 0; font-size: 0.97rem; }
+    .callout strong { color: #6b3a2a; }
+    .figure {
+      margin: 0.75rem 0;
+      padding: 0.65rem 0.85rem;
+      text-align: center;
+      position: relative;
+      z-index: 0;
+      isolation: isolate;
+    }
+    .figure > svg {
+      max-width: 100%;
+      height: auto;
+      display: block;
+      margin: 0 auto;
+      cursor: zoom-in;
+      border-radius: 6px;
+      transform: translate3d(0, 0, 0) scale(1);
+      transform-origin: 50% 45%;
+      backface-visibility: hidden;
+      transition:
+        transform 0.85s cubic-bezier(0.16, 1, 0.3, 1),
+        box-shadow 0.85s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .figure:hover > svg,
+    .figure:focus-within > svg {
+      transform: translate3d(0, 0, 0) scale(1.09);
+      box-shadow: 0 18px 44px rgba(20, 24, 32, 0.1), 0 0 0 1px rgba(30, 61, 50, 0.05);
+    }
+    .figure:hover,
+    .figure:focus-within {
+      z-index: 4;
+    }
+    @media (max-width: 600px) {
+      .figure {
+        padding: 0.5rem 0.4rem;
+      }
+      .figure:hover > svg,
+      .figure:focus-within > svg {
+        transform: translate3d(0, 0, 0) scale(1.04);
+      }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .figure > svg { transition: none; }
+      .figure:hover > svg,
+      .figure:focus-within > svg {
+        transform: translate3d(0, 0, 0) scale(1);
+        box-shadow: none;
+      }
+    }
+    .figure svg text, .figure svg tspan {
+      font-family: "DM Sans", "Segoe UI", system-ui, sans-serif;
+    }
+    .cap { font-size: 0.88rem; color: var(--muted); margin: 0.4rem 0 0.15rem; }
+    .figure-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.75rem;
+      margin: 0.9rem 0;
+      align-items: start;
+    }
+    @media (max-width: 600px) { .figure-row { grid-template-columns: 1fr; } }
+    .figure-row .figure { margin: 0; min-width: 0; }
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0.7rem; }
+    @media (max-width: 520px) { .grid-2 { grid-template-columns: 1fr; } }
+    .tiny { font-size: 0.82rem; color: var(--soft); }
+    code { font-family: ui-monospace, monospace; font-size: 0.85em; background: #eef1f5; padding: 0.1em 0.38em; border-radius: 4px; }
+    .page-break { break-before: page; }
+    table.simple { width: 100%; border-collapse: collapse; font-size: 0.9rem; margin: 0.5rem 0; }
+    table.simple th, table.simple td { border: 1px solid var(--line); padding: 0.4rem 0.5rem; text-align: left; }
+    table.simple th { background: #f1f3f5; color: var(--forest); }
+    .faq q { display: block; font-weight: 600; color: var(--forest); margin-top: 0.6rem; }
+    .faq p { margin: 0.25rem 0 0.4rem; }
+  </style>
+</head>
+<body>
+  <div class="sheet">
+    <div class="band">
+      <svg class="band-figure" width="200" height="100" viewBox="0 0 200 100" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
+        <g stroke="rgba(255,255,255,0.2)" fill="none" stroke-width="0.8">
+          <circle cx="40" cy="50" r="12" fill="rgba(201,162,39,0.12)" />
+          <circle cx="100" cy="30" r="10" fill="rgba(201,162,39,0.1)" />
+          <circle cx="160" cy="50" r="12" fill="rgba(201,162,39,0.12)" />
+          <line x1="52" y1="50" x2="88" y2="40" />
+          <line x1="110" y1="35" x2="148" y2="48" />
+        </g>
+        <text x="100" y="90" text-anchor="middle" fill="rgba(220,230,220,0.7)" font-size="12">vaults &rarr; engine &rarr; stable / peg</text>
+      </svg>
+      <p class="eyebrow">Lightpaper &middot; English &middot; expanded</p>
+      <h1>Ceitnot</h1>
+      <p class="subtitle">An autonomous, yield-aware credit engine on EVM networks. Users deposit <strong>yield-bearing ERC-4626</strong> collateral, borrow a <strong>stablecoin (ceitUSD in CDP mode)</strong>, and the protocol&rsquo;s <strong>Yield Siphon</strong> routes realized collateral appreciation into a <strong>reduction of effective debt</strong> for the market &mdash; without iterating every user in one transaction, and without the frontend ever holding private keys.</p>
+    </div>
+
+    <p class="print-hint no-print">
+      <strong>PDF:</strong> Open in Chrome &rarr; <strong>Print</strong> &rarr; <strong>Save as PDF</strong>. Enable <em>background graphics</em>, set margins to minimum.
+    </p>
+
+    <div class="inner">
+      <nav class="toc" aria-label="Contents">
+        <h2>Contents</h2>
+        <ol>
+          <li><a href="#s1">Executive summary</a></li>
+          <li><a href="#s2">The problem we solve</a></li>
+          <li><a href="#s3">Key actors &amp; contracts</a></li>
+          <li><a href="#s4">Glossary (plain English)</a></li>
+          <li><a href="#s5">End-to-end user journey</a></li>
+          <li><a href="#s6">Yield Siphon (deep dive)</a></li>
+          <li><a href="#s7">Interest rates (IRM) &mdash; separate from Siphon</a></li>
+          <li><a href="#s8">Health factor &amp; solvency</a></li>
+          <li><a href="#s9">Liquidations, penalties, bad debt</a></li>
+          <li><a href="#s10">Markets, caps, isolation</a></li>
+          <li><a href="#s11">ceitUSD, PSM, Router, Treasury</a></li>
+          <li><a href="#s12">Governance, timelock, upgradeability</a></li>
+          <li><a href="#s13">Security model (overview)</a></li>
+          <li><a href="#s14">What Ceitnot is <em>not</em></a></li>
+          <li><a href="#s15">FAQ</a></li>
+          <li><a href="#s16">Disclaimer</a></li>
+        </ol>
+      </nav>
+
+      <h2 id="s1"><span class="num">1.</span> Executive summary</h2>
+      <p class="lead"><strong>Ceitnot</strong> is a lending protocol that treats <strong>yield from collateral</strong> as a first-class input to solvency. While traditional lending is mostly &ldquo;you borrowed X, you owe interest until you repay&rdquo;, Ceitnot adds a second axis: <strong>when the collateral vault&rsquo;s share price increases</strong> (NAV / share in asset terms, via ERC-4626 <code>convertToAssets</code>), the protocol can <strong>apply that accrual against outstanding debt</strong> through a global scaling mechanism, executed by a permissionless or keeper-triggered <code>harvestYield</code> call.</p>
+      <p>That design is the <strong>Yield Siphon</strong>. It is not magic money printing: it is <strong>accounting</strong> that moves value from <em>collateral revaluation and vault yield</em> into a <em>reduction in effective debt for all borrowers in a market</em>, bounded by oracles, rounding rules, a heartbeat, and the reality that <strong>price can fall faster than yield accrues</strong> &mdash; which is where <strong>liquidations</strong> and <strong>risk parameters</strong> matter.</p>
+      <p><strong>Where it lives:</strong> one <strong>engine proxy</strong> users and integrations call; a <strong>market registry</strong> maps each <code>marketId</code> to an ERC-4626 vault, an oracle, risk (LTV, liquidation threshold, penalty), and optional IRM. <strong>ceitUSD</strong> in CDP mode is minted when users borrow and burned on repay. A <strong>PSM</strong> (optional deployment) can stabilize the peg to external stables. <strong>Governance</strong> (token + ve + governor + timelock) is the intended path for parameter changes in production.</p>
+
+      <div class="figure" aria-hidden="true">
+        <svg width="640" height="218" viewBox="0 0 640 218" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="High-level: user, engine, markets">
+          <text x="320" y="22" text-anchor="middle" font-size="20" font-weight="600" fill="#1e3d32">System map (simplified)</text>
+          <text x="143" y="40" text-anchor="middle" fill="#2a5244" font-size="11" font-weight="600">RPC / UI</text>
+          <rect x="16" y="48" width="108" height="44" rx="6" fill="#1e3d32" />
+          <text x="70" y="70" text-anchor="middle" fill="#fff" font-size="16.5" font-weight="600">User wallet</text>
+          <text x="70" y="86" text-anchor="middle" fill="#e8ece8" font-size="12.5">signs txs</text>
+          <line x1="124" y1="70" x2="158" y2="70" stroke="#c9a227" stroke-width="2.5" marker-end="url(#arrG)" />
+          <rect x="158" y="48" width="128" height="52" rx="6" fill="#2a5244" />
+          <text x="222" y="70" text-anchor="middle" fill="#fff" font-size="16.5" font-weight="600">CeitnotEngine</text>
+          <text x="222" y="88" text-anchor="middle" fill="#f0e0a8" font-size="12.5">UUPS proxy</text>
+          <line x1="222" y1="100" x2="222" y2="118" stroke="#b8c4be" stroke-width="1.5" />
+          <text x="222" y="133" text-anchor="middle" fill="#1e3d32" font-size="14" font-weight="600">MarketRegistry</text>
+          <rect x="102" y="138" width="240" height="34" rx="5" fill="#f8f9fb" stroke="#1e3d32" stroke-width="1" />
+          <text x="222" y="158" text-anchor="middle" fill="#2a3540" font-size="12.5">per marketId: vault, oracle, LTV, IRM, caps&hellip;</text>
+          <line x1="286" y1="74" x2="318" y2="74" stroke="#c9a227" stroke-width="2" />
+          <rect x="318" y="56" width="88" height="40" rx="5" fill="#3d4a5c" />
+          <text x="362" y="76" text-anchor="middle" fill="#fff" font-size="14" font-weight="600">ERC-4626</text>
+          <text x="362" y="90" text-anchor="middle" fill="#dbe0e8" font-size="11.5">collateral</text>
+          <line x1="406" y1="68" x2="432" y2="52" stroke="#b8c4be" stroke-width="1.5" />
+          <line x1="406" y1="76" x2="432" y2="92" stroke="#b8c4be" stroke-width="1.5" />
+          <rect x="432" y="38" width="78" height="30" rx="4" fill="#1e3d32" />
+          <text x="471" y="54" text-anchor="middle" fill="#fff" font-size="11.5" font-weight="600">Oracle</text>
+          <text x="471" y="64" text-anchor="middle" fill="#f0e0a8" font-size="10">→ USD</text>
+          <rect x="432" y="82" width="78" height="30" rx="4" fill="#4a3d2e" />
+          <text x="471" y="98" text-anchor="middle" fill="#fff" font-size="11.5" font-weight="600">ceitUSD</text>
+          <text x="471" y="108" text-anchor="middle" fill="#e8d4a8" font-size="10">mint / burn</text>
+          <line x1="362" y1="96" x2="362" y2="118" stroke="#b8c4be" stroke-width="1.5" />
+          <rect x="312" y="124" width="112" height="36" rx="5" fill="#5c4a3d" stroke="#c9a227" stroke-width="1.5" />
+          <text x="368" y="142" text-anchor="middle" fill="#fff" font-size="12.5" font-weight="600">PSM (opt.)</text>
+          <text x="368" y="156" text-anchor="middle" fill="#e8d4a8" font-size="10">peg / stable in-out</text>
+          <defs>
+            <marker id="arrG" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto"><polygon points="0,0 6,3 0,6" fill="#c9a227" /></marker>
+          </defs>
+        </svg>
+        <p class="cap">One stable <strong>engine</strong> address; each <code>marketId</code> pulls config (vault + oracle + risk) from the registry. PSM and ceitUSD sit beside the core credit loop.</p>
+      </div>
+
+      <h2 id="s2"><span class="num">2.</span> The problem we solve</h2>
+      <p>Many DeFi borrowers hold <strong>productive assets</strong> (LST, vault shares, compounding stables) but still service debt as if the collateral were static. The mental overhead is high: <em>claim rewards, sell, swap, manually repay, repeat</em>. Ceitnot&rsquo;s Siphon is a protocol-native attempt to <strong>align principal reduction with the economic reality that collateral often earns on-chain yield</strong>, while keeping solvency enforcement explicit through <strong>health checks</strong> and <strong>liquidations</strong>.</p>
+      <p>We do <strong>not</strong> claim that yield always outruns borrow costs or mark-to-market losses. <strong>Interest</strong> still compounds on debt via the IRM. <strong>Price risk</strong> is still the dominant tail risk for volatile collaterals. Siphon is a <strong>convenience and capital-efficiency feature</strong> inside a conservative risk framework, not a promise of risk-free carry.</p>
+
+      <div class="figure-row" aria-hidden="true">
+        <div class="figure">
+          <svg width="280" height="150" viewBox="0 0 280 150" xmlns="http://www.w3.org/2000/svg">
+            <text x="140" y="16" text-anchor="middle" font-size="15.5" font-weight="600" fill="#8b1a1a">Classic mental load</text>
+            <rect x="20" y="32" width="50" height="18" rx="2" fill="#d4d8e0" /><text x="45" y="44" text-anchor="middle" font-size="11.5">claim</text>
+            <text x="75" y="44" font-size="16.5" fill="#5e6470">→</text>
+            <rect x="90" y="32" width="50" height="18" rx="2" fill="#d4d8e0" /><text x="115" y="44" text-anchor="middle" font-size="11.5">swap</text>
+            <text x="145" y="44" font-size="16.5" fill="#5e6470">→</text>
+            <rect x="160" y="32" width="50" height="18" rx="2" fill="#d4d8e0" /><text x="185" y="44" text-anchor="middle" font-size="11.5">repay</text>
+            <text x="215" y="44" font-size="16.5" fill="#5e6470">→</text>
+            <text x="235" y="44" font-size="11.5" fill="#5e6470">loop</text>
+            <text x="140" y="70" text-anchor="middle" font-size="11.5" fill="#5e6470">Many tx, timing risk, tax/GAS noise</text>
+            <line x1="30" y1="90" x2="250" y2="90" stroke="#e8c4c4" stroke-dasharray="3 2" />
+            <text x="140" y="112" text-anchor="middle" font-size="11.5" font-weight="600" fill="#1e3d32">Ceitnot idea</text>
+            <text x="140" y="128" text-anchor="middle" font-size="11.5" fill="#2a5244">yield → protocol accounting → debt scale</text>
+          </svg>
+          <p class="cap">Siphon tries to <strong>encode</strong> part of that loop on-chain, not to remove prudence.</p>
+        </div>
+        <div class="figure">
+          <svg width="280" height="150" viewBox="0 0 280 150" xmlns="http://www.w3.org/2000/svg">
+            <text x="140" y="16" text-anchor="middle" font-size="15.5" font-weight="600" fill="#1e3d32">What competes in time</text>
+            <line x1="30" y1="95" x2="250" y2="95" stroke="#c9a227" stroke-width="2" />
+            <circle cx="80" cy="95" r="5" fill="#1e3d32" />
+            <text x="80" y="88" text-anchor="middle" font-size="11.5" fill="#1e3d32">+vault APY</text>
+            <text x="80" y="110" text-anchor="middle" font-size="9.5" fill="#5e6470">(shares reprice)</text>
+            <circle cx="200" cy="95" r="5" fill="#3d4a5c" />
+            <text x="200" y="88" text-anchor="middle" font-size="11.5" fill="#3d4a5c">+borrow cost</text>
+            <text x="200" y="110" text-anchor="middle" font-size="9.5" fill="#5e6470">(IRM)</text>
+            <circle cx="140" cy="50" r="5" fill="#8b1a1a" />
+            <line x1="80" y1="95" x2="135" y2="58" stroke="#e2e5ec" />
+            <line x1="200" y1="95" x2="145" y2="58" stroke="#e2e5ec" />
+            <text x="140" y="45" text-anchor="middle" font-size="9.5" font-weight="600" fill="#8b1a1a">-collateral $</text>
+            <text x="140" y="55" text-anchor="middle" font-size="11" fill="#5e6470">(mark price)</text>
+            <text x="140" y="128" text-anchor="middle" font-size="9.5" fill="#5e6470">Net position health = f(all three), not f(yield only)</text>
+          </svg>
+          <p class="cap">Three clocks: <strong>vault accrual</strong>, <strong>debt interest</strong>, <strong>mark price</strong> of the collateral asset in USD.</p>
+        </div>
+      </div>
+
+      <h2 id="s3" class="page-break"><span class="num">3.</span> Key actors &amp; contracts (mental map)</h2>
+      <p>When you read the codebase, these are the &ldquo;main characters&rdquo;:</p>
+      <table class="simple">
+        <tr><th>Component</th><th>Role in one sentence</th></tr>
+        <tr><td><code>CeitnotProxy</code> (Engine)</td><td>Stable address users interact with; holds state; <code>delegatecall</code> to implementation.</td></tr>
+        <tr><td><code>CeitnotEngine</code> (impl)</td><td>Deposits, borrows, repays, liquidations, <code>harvestYield</code>, accrual, safety switches.</td></tr>
+        <tr><td><code>CeitnotMarketRegistry</code></td><td>Per-<code>marketId</code> config: vault, oracle, LTV, LT, fees, IRM, caps, isolation, liquidation add-ons.</td></tr>
+        <tr><td>ERC-4626 <code>vault</code></td><td>Collateral standard: shares; price path via <code>convertToAssets</code>.</td></tr>
+        <tr><td><code>OracleRelay</code></td><td>USD pricing for risk / HF; may chain multiple feeds with staleness rules.</td></tr>
+        <tr><td><code>CeitnotUSD</code></td><td>Debt asset in CDP: minted/burned under minter gating; permit support.</td></tr>
+        <tr><td><code>CeitnotPSM</code></td><td>Swap between ceitUSD and a pegged stable; fee parameters <code>tin</code>/<code>tout</code>.</td></tr>
+        <tr><td>Gov stack</td><td><code>CeitnotToken</code>, <code>VeCeitnot</code>, <code>CeitnotGovernor</code>, <code>Timelock</code> &mdash; delayed execution of upgrades/params.</td></tr>
+      </table>
+      <p class="tiny">Exact ABIs, storage layout, and event names: see in-repo <code>docs/CONTRACTS.md</code> and source. This lightpaper is descriptive, not a formal spec.</p>
+
+      <div class="figure" aria-hidden="true">
+        <svg width="600" height="248" viewBox="0 0 600 248" xmlns="http://www.w3.org/2000/svg">
+          <text x="300" y="18" text-anchor="middle" font-size="20" font-weight="600" fill="#1e3d32">Data &amp; control flow (per position)</text>
+          <rect x="18" y="36" width="108" height="64" rx="6" fill="#1e3d32" />
+          <text x="72" y="56" text-anchor="middle" fill="#fff" font-size="14" font-weight="600">Position</text>
+          <text x="72" y="74" text-anchor="middle" fill="#e0e8e4" font-size="11.5">collateralShares</text>
+          <text x="72" y="90" text-anchor="middle" fill="#e0e8e4" font-size="11.5">debt &times; scale</text>
+          <line x1="126" y1="68" x2="168" y2="68" stroke="#c9a227" stroke-width="2" />
+          <text x="147" y="58" text-anchor="middle" font-size="10" fill="#5e6470" font-weight="600">read</text>
+          <rect x="168" y="36" width="108" height="64" rx="6" fill="#2a5244" />
+          <text x="222" y="56" text-anchor="middle" fill="#fff" font-size="14" font-weight="600">Vault</text>
+          <text x="222" y="78" text-anchor="middle" fill="#f0e0a8" font-size="11.5">convertToAssets</text>
+          <line x1="222" y1="100" x2="222" y2="112" stroke="#b8c4be" />
+          <text x="222" y="128" text-anchor="middle" font-size="10" fill="#5e6470">assets / share</text>
+          <line x1="276" y1="68" x2="314" y2="68" stroke="#b8c4be" />
+          <rect x="314" y="36" width="108" height="64" rx="6" fill="#3d4a5c" />
+          <text x="368" y="56" text-anchor="middle" fill="#fff" font-size="14" font-weight="600">Oracle relay</text>
+          <text x="368" y="78" text-anchor="middle" fill="#dbe0e8" font-size="11.5">asset &rarr; USD</text>
+          <line x1="368" y1="100" x2="368" y2="112" stroke="#b8c4be" />
+          <text x="368" y="128" text-anchor="middle" font-size="10" fill="#5e6470">price &amp; staleness</text>
+          <line x1="422" y1="68" x2="448" y2="68" stroke="#c9a227" stroke-width="2" />
+          <rect x="448" y="36" width="134" height="64" rx="6" fill="#eef0f3" stroke="#1e3d32" stroke-width="1.5" />
+          <text x="515" y="58" text-anchor="middle" font-size="12.5" font-weight="600" fill="#1e3d32">HF / LTV</text>
+          <text x="515" y="76" text-anchor="middle" font-size="10" fill="#5e6470">allow borrow?</text>
+          <text x="515" y="90" text-anchor="middle" font-size="10" fill="#5e6470">allow withdraw?</text>
+          <rect x="20" y="150" width="560" height="90" rx="6" fill="#f0f2f5" stroke="#1e3d32" stroke-width="0.5" />
+          <text x="300" y="172" text-anchor="middle" font-size="12.5" font-weight="600" fill="#1e3d32">Public calls that move state for everyone in a market</text>
+          <text x="100" y="200" text-anchor="middle" font-size="10" fill="#2a5244" font-style="italic" font-weight="600">harvestYield</text>
+          <text x="100" y="215" text-anchor="middle" font-size="10" fill="#5e6470">updates global debt scale (O(1))</text>
+          <line x1="200" y1="208" x2="250" y2="208" stroke="#c9a227" stroke-dasharray="3 2" />
+          <text x="300" y="200" text-anchor="middle" font-size="10" fill="#2a5244" font-style="italic" font-weight="600">liquidate&hellip;</text>
+          <text x="300" y="215" text-anchor="middle" font-size="10" fill="#5e6470">seize collateral if HF &lt; 1</text>
+          <line x1="350" y1="208" x2="400" y2="208" stroke="#c9a227" stroke-dasharray="3 2" />
+          <text x="500" y="200" text-anchor="middle" font-size="10" fill="#2a5244" font-style="italic" font-weight="600">governance / timelock</text>
+          <text x="500" y="215" text-anchor="middle" font-size="10" fill="#5e6470">params (after delay)</text>
+        </svg>
+        <p class="cap">The engine <strong>composes</strong> vault state and oracle output into a risk decision; Siphon/liquidation/governance are separate &ldquo;lateral&rdquo; entry points to the same pool.</p>
+      </div>
+
+      <h2 id="s4"><span class="num">4.</span> Glossary (plain English)</h2>
+      <div class="gloss-grid">
+        <div class="gloss-item"><strong>ERC-4626 (tokenized vault)</strong><span>A standard for &ldquo;pool my tokens, give me a share&rdquo;. The share&rsquo;s value in the underlying can rise (yield, or NAV changes). Ceitnot collateral is held as vault <strong>shares</strong>, not &ldquo;raw&rdquo; token unless the vault is 1:1.</span></div>
+        <div class="gloss-item"><strong>ceitUSD (CDP debt unit)</strong><span>When the engine mints to your address on borrow, you hold ceitUSD as <strong>liquidity</strong>; simultaneously your position records <strong>principal debt</strong>. Repay burns ceitUSD and shrinks what you owe.</span></div>
+        <div class="gloss-item"><strong>LTV vs liquidation threshold (LT)</strong><span>LTV caps how much you can borrow <em>per dollar of effective collateral</em>. The liquidation threshold is <strong>higher</strong> (more conservative) so there remains buffer for penalties and liquidator incentives <strong>before</strong> the position is underwater in mark-to-market terms.</span></div>
+        <div class="gloss-item"><strong>Health Factor (HF)</strong><span>A cross-asset scalar: <strong>HF &ge; 1</strong> means your position is not eligible for standard liquidation. &lt; 1 means liquidations may occur (subject to protocol rules).</span></div>
+        <div class="gloss-item"><strong>globalDebtScale (RAY)</strong><span>Shared multiplier that reduces the <em>effect</em> of notional debt after yield is harvested &mdash; without looping over all users. Personal debt &ldquo;settles&rdquo; to the current scale on your next interaction.</span></div>
+        <div class="gloss-item"><strong>PSM (Peg Stability Module)</strong><span>A swap between ceitUSD and an external stable with tight fees, used to manage peg pressure and on/off-ramps for the stable side of the system.</span></div>
+        <div class="gloss-item"><strong>Timelock</strong><span>Time delay between a passed governance action and on-chain execution &mdash; public reaction window.</span></div>
+      </div>
+
+      <div class="figure" aria-hidden="true">
+        <svg width="560" height="108" viewBox="0 0 560 108" xmlns="http://www.w3.org/2000/svg">
+          <text x="280" y="16" text-anchor="middle" font-size="16.5" font-weight="600" fill="#1e3d32">LTV vs liquidation threshold (schematic)</text>
+          <text x="40" y="40" text-anchor="middle" font-size="11.5" fill="#5e6470">collateral $</text>
+          <rect x="60" y="32" width="300" height="20" fill="#f0f4f0" stroke="#1e3d32" />
+          <rect x="60" y="32" width="90" height="20" fill="#c9a227" opacity="0.45" />
+          <text x="105" y="45" text-anchor="middle" font-size="9.5" font-weight="600" fill="#1e3d32">max borrow @ LTV</text>
+          <rect x="60" y="32" width="200" height="20" fill="none" stroke="#1e3d32" stroke-dasharray="3 2" />
+          <text x="200" y="24" text-anchor="middle" font-size="11" fill="#1e3d32">safety margin to LT</text>
+          <text x="420" y="40" text-anchor="middle" font-size="9.5" fill="#5e6470" font-style="italic">&larr; headroom for oracle lag &amp; penalties</text>
+          <line x1="60" y1="60" x2="360" y2="60" stroke="#e2e5ec" />
+          <text x="280" y="78" text-anchor="middle" font-size="8.5" fill="#2a5244">If debt in USD grows (interest) or collateral $ falls (mark), the safety strip</text>
+          <text x="280" y="92" text-anchor="middle" font-size="8.5" fill="#2a5244">shrinks: HF can cross &lt;1 before a naive UI shows LTV as &ldquo;full&rdquo;.</text>
+        </svg>
+        <p class="cap">The diagram is <strong>not to scale</strong> &mdash; use live parameters from the registry for your deployment.</p>
+      </div>
+
+      <h2 id="s5"><span class="num">5.</span> End-to-end user journey</h2>
+      <p>Below is the <strong>chronological story</strong> of a position. Wording is simplified; gas, approvals, and exact function names are in the contracts / UI.</p>
+
+      <div class="figure" aria-hidden="true">
+        <svg width="600" height="120" viewBox="0 0 600 120" xmlns="http://www.w3.org/2000/svg">
+          <text x="300" y="16" text-anchor="middle" font-size="15.5" font-weight="600" fill="#1e3d32">Journey (linear)</text>
+          <g font-size="10.5" font-weight="600">
+            <rect x="8" y="34" width="60" height="34" rx="4" fill="#1e3d32" />
+            <text x="38" y="53" text-anchor="middle" fill="#fff">connect</text>
+            <line x1="68" y1="51" x2="78" y2="51" stroke="#c9a227" stroke-width="1.2" />
+            <rect x="78" y="34" width="60" height="34" rx="4" fill="#2a5244" />
+            <text x="108" y="53" text-anchor="middle" fill="#fff">market</text>
+            <line x1="138" y1="51" x2="148" y2="51" stroke="#c9a227" stroke-width="1.2" />
+            <rect x="148" y="34" width="60" height="34" rx="4" fill="#1e3d32" />
+            <text x="178" y="53" text-anchor="middle" fill="#fff">deposit</text>
+            <line x1="208" y1="51" x2="218" y2="51" stroke="#c9a227" />
+            <rect x="218" y="34" width="60" height="34" rx="4" fill="#2a5244" />
+            <text x="248" y="53" text-anchor="middle" fill="#fff">borrow</text>
+            <line x1="278" y1="51" x2="288" y2="51" stroke="#c9a227" />
+            <rect x="288" y="34" width="52" height="34" rx="4" fill="#3d4a5c" />
+            <text x="314" y="50" text-anchor="middle" fill="#fff" font-size="9.5">time +</text>
+            <text x="314" y="60" text-anchor="middle" fill="#dbe0e8" font-size="9.5">IRM</text>
+            <line x1="340" y1="51" x2="350" y2="51" stroke="#c9a227" />
+            <rect x="350" y="34" width="58" height="34" rx="4" fill="#1e3d32" />
+            <text x="379" y="53" text-anchor="middle" fill="#fff" font-size="9.5">harvest</text>
+            <line x1="408" y1="51" x2="418" y2="51" stroke="#c9a227" />
+            <rect x="418" y="34" width="64" height="34" rx="4" fill="#2a5244" />
+            <text x="450" y="53" text-anchor="middle" fill="#fff" font-size="9.5">repay / wd</text>
+            <line x1="482" y1="51" x2="492" y2="51" stroke="#c9a227" />
+            <rect x="492" y="34" width="100" height="34" rx="4" fill="#5c2a2a" />
+            <text x="542" y="53" text-anchor="middle" fill="#fff" font-size="11">liq. if HF&lt;1</text>
+          </g>
+          <text x="300" y="100" text-anchor="middle" font-size="9" fill="#5e6470">&ldquo;Time + IRM&rdquo; and &ldquo;harvest&rdquo; are parallel storylines: interest accrues continuously; Siphon only moves when a valid harvest runs.</text>
+        </svg>
+        <p class="cap">The steps below add narrative detail to this pipeline.</p>
+      </div>
+
+      <div class="figure" aria-hidden="true">
+        <svg width="480" height="100" viewBox="0 0 480 100" xmlns="http://www.w3.org/2000/svg">
+          <text x="240" y="16" text-anchor="middle" font-size="15.5" font-weight="600" fill="#1e3d32">Non-custodial dApp</text>
+          <rect x="40" y="32" width="100" height="40" rx="6" fill="#eef0f3" stroke="#1e3d32" />
+          <text x="90" y="50" text-anchor="middle" font-size="11.5" font-weight="600" fill="#1e3d32">Browser UI</text>
+          <text x="90" y="62" text-anchor="middle" font-size="9.5" fill="#5e6470">read chain / stats</text>
+          <line x1="140" y1="52" x2="175" y2="52" stroke="#c9a227" />
+          <text x="157" y="46" font-size="11" fill="#5e6470">propose</text>
+          <rect x="175" y="32" width="100" height="40" rx="6" fill="#1e3d32" />
+          <text x="225" y="52" text-anchor="middle" fill="#fff" font-size="11.5" font-weight="600">Wallet</text>
+          <line x1="275" y1="52" x2="310" y2="52" stroke="#c9a227" />
+          <text x="292" y="46" font-size="11" fill="#5e6470">sign</text>
+          <rect x="310" y="32" width="130" height="40" rx="6" fill="#2a5244" />
+          <text x="375" y="50" text-anchor="middle" fill="#fff" font-size="11.5" font-weight="600">EVM (Ceitnot)</text>
+          <text x="375" y="62" text-anchor="middle" fill="#e0e8e4" font-size="9.5">state change</text>
+        </svg>
+        <p class="cap">No <strong>private keys</strong> in the app server; at most an RPC and cached config.</p>
+      </div>
+
+      <div class="steps">
+        <div class="step"><strong>Connect a wallet</strong> (MetaMask, Rabby, &hellip;). The web app is a <strong>view + transaction sender</strong>; it does not store seed phrases. Every state-changing call is signed by you.</div>
+        <div class="step"><strong>Pick a market (marketId)</strong>. The UI reads <code>MarketRegistry</code> for vault symbol, LTV, caps, and oracles. If the market is <strong>isolated</strong>, you cannot &ldquo;use&rdquo; that collateral to back borrowing on other markets in the same cross way.</div>
+        <div class="step"><strong>Deposit</strong> ERC-4626 shares into the engine. Your position stores <code>collateralShares</code>. The system values collateral in USD for HF using the relay price and vault conversion.</div>
+        <div class="step"><strong>Borrow (mint ceitUSD)</strong> up to the allowed LTV and market caps. You now have spendable ceitUSD and a recorded debt position. <strong>Interest</strong> begins to accrue per the IRM and utilization.</div>
+        <div class="step"><strong>Time passes</strong>. Two things happen in parallel: (a) <strong>vault share price</strong> may increase from yield, (b) <strong>your debt</strong> grows from borrow interest. These are <strong>not the same</strong> &mdash; see sections 6&ndash;7.</div>
+        <div class="step"><strong>Harvest</strong> (anyone, subject to <code>heartbeat</code> and min-yield): <code>harvestYield(marketId)</code> materializes the vault delta since the last snapshot into a <em>debt credit</em> to the market via <code>globalDebtScale</code>, minus an optional <code>yieldFeeBps</code> to reserves.</div>
+        <div class="step"><strong>Repay or withdraw</strong> when you choose. If HF would fall too low, withdraw is limited. <strong>Repay</strong> burns ceitUSD and reduces debt.</div>
+        <div class="step"><strong>Liquidation</strong> if HF &lt; 1. A third party repays your debt in the debt token and seizes a portion of your collateral, including a <strong>liquidation penalty / spread</strong> that rewards the liquidator and (optionally) the protocol. Bad tail outcomes can become <strong>bad debt</strong> with reserve absorption.</div>
+      </div>
+
+      <div class="figure" aria-hidden="true">
+        <svg width="520" height="128" viewBox="0 0 520 128" xmlns="http://www.w3.org/2000/svg">
+          <text x="260" y="22" text-anchor="middle" font-size="20" font-weight="600" fill="#1e3d32">Mental model: two money flows</text>
+          <rect x="20" y="42" width="200" height="70" rx="8" fill="#1e3d32" />
+          <text x="120" y="70" text-anchor="middle" fill="#fff" font-size="16.5" font-weight="600">Collateral side</text>
+          <text x="120" y="90" text-anchor="middle" fill="#e0e8e4" font-size="14">vault yield / price</text>
+          <text x="120" y="105" text-anchor="middle" fill="#f0e0a8" font-size="14">can reduce debt via Siphon</text>
+          <text x="260" y="82" text-anchor="middle" font-size="34" fill="#c9a227">+</text>
+          <rect x="300" y="42" width="200" height="70" rx="8" fill="#3d4a5c" />
+          <text x="400" y="70" text-anchor="middle" fill="#fff" font-size="16.5" font-weight="600">Borrow side</text>
+          <text x="400" y="90" text-anchor="middle" fill="#dbe0e8" font-size="14">IRM interest on debt</text>
+          <text x="400" y="105" text-anchor="middle" fill="#ffc9c9" font-size="14">increases what you owe</text>
+        </svg>
+        <p class="cap">You must think about <strong>both</strong> flows. Strong vault yield does not automatically mean &ldquo;free loan&rdquo; if borrow APR is high or HF is tight.</p>
+      </div>
+
+      <h2 id="s6" class="page-break"><span class="num">6.</span> Yield Siphon (deep dive)</h2>
+      <h3>6.1 Intuition</h3>
+      <p>Think of a <strong>single lever</strong> that scales everyone&rsquo;s debt notional in a market, instead of trying to <strong>add payments</strong> to each borrower separately. When the vault&rsquo;s <strong>assets per share</strong> has risen since the last harvest, the system converts that <em>incremental asset amount</em> into an equivalent <em>debt token amount</em> using the oracle, then <strong>shrinks the effective total debt</strong> by moving the global scale. Your personal row in storage still has a &ldquo;principal&rdquo; field, but the <strong>current debt you owe</strong> is principal times the effective scale &mdash; so when the scale drops, the effective amount you owe drops <strong>for everyone proportionally</strong>.</p>
+      <div class="figure" aria-hidden="true">
+        <svg width="600" height="230" viewBox="0 0 600 230" xmlns="http://www.w3.org/2000/svg">
+          <text x="300" y="16" text-anchor="middle" font-size="18" font-weight="600" fill="#1e3d32">Yield Siphon path (per market, conceptual)</text>
+          <rect x="20" y="40" width="100" height="48" rx="6" fill="#1e3d32" />
+          <text x="70" y="60" text-anchor="middle" fill="#fff" font-size="14" font-weight="600">ERC-4626</text>
+          <text x="70" y="78" text-anchor="middle" fill="#e0e8e4" font-size="11.5">assets / share &uarr;</text>
+          <line x1="120" y1="64" x2="168" y2="64" stroke="#c9a227" stroke-width="2" />
+          <text x="144" y="54" text-anchor="middle" font-size="10" fill="#5e6470" font-weight="600">snapshot</text>
+          <text x="144" y="86" text-anchor="middle" font-size="10" fill="#5e6470">(vault &Delta; since last)</text>
+          <rect x="168" y="40" width="110" height="48" rx="6" fill="#2a5244" />
+          <text x="223" y="60" text-anchor="middle" fill="#fff" font-size="12.5" font-weight="600">harvestYield</text>
+          <text x="223" y="78" text-anchor="middle" fill="#f0e0a8" font-size="9.5">oracles, heartbeat</text>
+          <line x1="278" y1="64" x2="312" y2="64" stroke="#c9a227" stroke-width="2" />
+          <rect x="312" y="36" width="100" height="58" rx="5" fill="#eef0f3" stroke="#c9a227" stroke-width="1.5" />
+          <text x="362" y="55" text-anchor="middle" font-size="12" font-weight="600" fill="#1e3d32">globalDebtScale</text>
+          <text x="362" y="70" text-anchor="middle" font-size="10" fill="#5e6470">shared factor</text>
+          <text x="362" y="84" text-anchor="middle" font-size="9.5" fill="#2a5244" font-style="italic">(RAY)</text>
+          <line x1="412" y1="64" x2="456" y2="64" stroke="#b8c4be" stroke-width="1.5" />
+          <text x="434" y="50" text-anchor="middle" font-size="9.5" fill="#5e6470" font-weight="600">per user</text>
+          <text x="434" y="86" text-anchor="middle" font-size="9.5" fill="#5e6470" font-style="italic">(lazy)</text>
+          <rect x="456" y="40" width="124" height="48" rx="6" fill="#3d4a5c" />
+          <text x="518" y="60" text-anchor="middle" fill="#fff" font-size="12.5" font-weight="600">Next tx</text>
+          <text x="518" y="78" text-anchor="middle" fill="#dbe0e8" font-size="9.5">settle to scale</text>
+          <text x="470" y="100" text-anchor="middle" font-size="9.5" fill="#6b4a1a" font-weight="600">optional fee &rarr; reserves</text>
+          <line x1="50" y1="112" x2="550" y2="112" stroke="#e2e5ec" stroke-dasharray="4 2" />
+          <text x="300" y="132" text-anchor="middle" font-size="11" font-weight="600" fill="#1e3d32">Many borrowers, one shared lever</text>
+          <text x="300" y="152" text-anchor="middle" font-size="10" fill="#5e6470">Effective debt = f(principal, scale&hellip;); no per-user loop inside harvest</text>
+          <text x="300" y="200" text-anchor="middle" font-size="9.5" fill="#5e6470" font-style="italic">Illustration only. See engine source and tests for exact ordering.</text>
+        </svg>
+        <p class="cap">The key idea: <strong>one</strong> global update propagates to all positions the next time each borrower touches the system (or their view is materialized in the UI with the same rules).</p>
+      </div>
+
+      <h3>6.2 Why it is O(1)</h3>
+      <p>Updating one <code>globalDebtScale</code> and a few market snapshot fields (last price per share, last harvest time) is <strong>constant cost</strong> in the number of users. This matters on L2: you avoid unbounded loops over positions that would make harvest unusable at scale.</p>
+
+      <div class="figure-row" aria-hidden="true">
+        <div class="figure">
+          <svg width="260" height="160" viewBox="0 0 260 160" xmlns="http://www.w3.org/2000/svg">
+            <text x="130" y="16" text-anchor="middle" font-size="14" font-weight="600" fill="#8b1a1a">Naive: O(n) borrowers</text>
+            <text x="130" y="32" text-anchor="middle" font-size="11" fill="#5e6470">for each user { update row &rarr; gas &times; n }</text>
+            <rect x="20" y="50" width="30" height="8" fill="#2a5244" opacity="0.3" />
+            <rect x="20" y="64" width="30" height="8" fill="#2a5244" opacity="0.3" />
+            <rect x="20" y="78" width="30" height="8" fill="#2a5244" opacity="0.3" />
+            <text x="100" y="70" text-anchor="middle" font-size="9.5" fill="#5e6470" font-style="italic">&vellip; many rows</text>
+            <line x1="150" y1="50" x2="220" y2="120" stroke="#c9a227" />
+            <text x="200" y="100" text-anchor="middle" font-size="9.5" font-weight="600" fill="#8b1a1a">&Cross;</text>
+            <text x="130" y="130" text-anchor="middle" font-size="11" fill="#5e6470">unbounded in large markets</text>
+          </svg>
+        </div>
+        <div class="figure">
+          <svg width="260" height="160" viewBox="0 0 260 160" xmlns="http://www.w3.org/2000/svg">
+            <text x="130" y="16" text-anchor="middle" font-size="14" font-weight="600" fill="#1e3d32">Ceitnot: O(1) harvest</text>
+            <text x="130" y="32" text-anchor="middle" font-size="11" fill="#5e6470">update 1&times; global scale + market snapshot</text>
+            <rect x="50" y="60" width="160" height="40" rx="5" fill="#1e3d32" />
+            <text x="130" y="82" text-anchor="middle" fill="#fff" font-size="14" font-weight="600">state delta</text>
+            <text x="130" y="95" text-anchor="middle" fill="#f0e0a8" font-size="9.5">n users, fixed gas (≈)</text>
+            <text x="130" y="120" text-anchor="middle" font-size="11" fill="#2a5244" font-style="italic">per-user work deferred</text>
+            <text x="130" y="140" text-anchor="middle" font-size="11" fill="#5e6470">to their own txs</text>
+          </svg>
+        </div>
+      </div>
+      <p class="cap" style="margin-top:0.2rem">Lazy settlement shifts per-user work from <strong>harvest</strong> to <strong>interact / liquidate / view</strong>, keeping the shared path cheap.</p>
+      <h3>6.3 Lazy settlement</h3>
+      <p>When you interact later, the engine <strong>settles your position</strong> to the new scale. Until then, your on-disk &ldquo;principal&rdquo; may look stale; <strong>the true debt is the compositional view</strong>. This is standard index accounting (like interest indices in classic lending) but applied to <strong>realized yield impact</strong> on the collateral side.</p>
+      <h3>6.4 Guardrails in plain language</h3>
+      <ul>
+        <li><strong>Heartbeat</strong> &mdash; you cannot harvest every block; the protocol enforces a minimum interval to reduce noise and gameability.</li>
+        <li><strong>Min harvest size</strong> (if configured) &mdash; avoid dust harvest spam.</li>
+        <li><strong>Rounding</strong> &mdash; debt is rounded <strong>up</strong> in favor of the protocol where applicable; the scale after yield is conservative so the protocol does not &ldquo;over-forgive&rdquo; debt by accident.</li>
+        <li><strong>Oracle failure</strong> &mdash; if price is zero or bad, the harvest path typically aborts the debt credit for safety.</li>
+      </ul>
+      <div class="callout"><strong>Critical nuance.</strong> Siphon helps when <em>the collateral</em> has positive carry or <em>re-prices up</em>. If <strong>collateral market price</strong> crashes, Siphon is not a substitute for <strong>liquidation</strong>. The protocol&rsquo;s first line of defense against insolvency in a downturn is <strong>risk parameters + liquidations</strong>, not the hope that &ldquo;yield will catch up&rdquo;.</div>
+
+      <h2 id="s7"><span class="num">7.</span> Interest rates (IRM) &mdash; separate from Siphon</h2>
+      <p>The <strong>Interest Rate Model</strong> is a classic <strong>kinked curve</strong>: a <strong>base rate</strong> plus a first slope <strong>below</strong> a <strong>utilization kink</strong>, and a steeper <strong>second slope</strong> <strong>above</strong> the kink, because borrowing becomes scarcer. Part of the interest is routed to the protocol via a <strong>reserve factor</strong> (a slice of accrual that builds <code>totalReserves</code> to absorb bad debt and fund maintenance).</p>
+      <p>Why this matters: <strong>Siphon reduces effective debt from collateral yield</strong>, while the IRM <strong>charges you for the privilege of holding debt</strong> as a function of pool utilization. In stressed regimes, IRM can spike &mdash; you can still be worse off on net <strong>even with positive vault yield</strong> if the borrow side is expensive and your position is small / short-lived. Always look at <strong>net carry</strong> and <strong>HF margin</strong>, not headline APY in isolation.</p>
+
+      <div class="figure" aria-hidden="true">
+        <svg width="560" height="180" viewBox="0 0 560 180" xmlns="http://www.w3.org/2000/svg">
+          <text x="280" y="16" text-anchor="middle" font-size="16.5" font-weight="600" fill="#1e3d32">Kinked borrow APR (schematic, not a deployment curve)</text>
+          <line x1="50" y1="140" x2="480" y2="140" stroke="#2a5244" stroke-width="1" />
+          <line x1="50" y1="40" x2="50" y2="140" stroke="#2a5244" stroke-width="1" />
+          <text x="25" y="90" text-anchor="middle" font-size="9.5" fill="#5e6470" transform="rotate(-90 25 90)">borrow APR</text>
+          <text x="280" y="160" text-anchor="middle" font-size="9.5" fill="#5e6470">utilization (borrowed / supplied)</text>
+          <polyline points="50,120 200,100 200,100 300,50 450,30" fill="none" stroke="#1e3d32" stroke-width="2" />
+          <line x1="200" y1="40" x2="200" y2="140" stroke="#c9a227" stroke-dasharray="2 1" />
+          <text x="200" y="152" text-anchor="middle" font-size="11" font-weight="600" fill="#c9a227">kink (u&lowast;)</text>
+          <text x="120" y="105" text-anchor="middle" font-size="11" fill="#5e6470" font-style="italic">low slope (below kink)</text>
+          <text x="350" y="60" text-anchor="middle" font-size="11" fill="#5e6470" font-style="italic">steep (above kink)</text>
+          <text x="280" y="30" text-anchor="middle" font-size="11" fill="#1e3d32">+ base rate in contract params</text>
+          <rect x="360" y="20" width="180" height="50" rx="4" fill="#f0f2f5" stroke="#e2e5ec" />
+          <text x="450" y="38" text-anchor="middle" font-size="11" font-weight="600" fill="#1e3d32">reserve factor</text>
+          <text x="450" y="50" text-anchor="middle" font-size="10" fill="#5e6470">slice of accrual &rarr; totalReserves</text>
+        </svg>
+        <p class="cap">Siphon <strong>does not replace</strong> this curve. It is a <strong>collateral-side</strong> term; the IRM is the <strong>debt / pool utilization</strong> term.</p>
+      </div>
+
+      <h2 id="s8"><span class="num">8.</span> Health factor &amp; solvency</h2>
+      <p>At a high level, the protocol ensures that <strong>the dollar value of your collateral (with haircuts and liquidation thresholds) stays ahead of the dollar value of your debt</strong>. The exact formula is in <code>docs/LIQUIDATION.md</code>; the intuition is: <strong>HF &lt; 1</strong> means &ldquo;we can no longer trust this loan to be over-collateralized at current marks&rdquo;, so <strong>permissionless liquidation</strong> is the standard remedy.</p>
+      <p>Cross-market aggregation means you can (unless isolated) <strong>combine</strong> multiple vaults in one user risk profile, but the registry still applies <strong>per-market parameters</strong> to each leg when computing the aggregate HF.</p>
+
+      <div class="figure" aria-hidden="true">
+        <svg width="520" height="130" viewBox="0 0 520 130" xmlns="http://www.w3.org/2000/svg">
+          <text x="260" y="16" text-anchor="middle" font-size="15.5" font-weight="600" fill="#1e3d32">Health factor: cartoon balance (HF &asymp; 1 is the &ldquo;cliff&rdquo; edge)</text>
+          <line x1="70" y1="100" x2="450" y2="100" stroke="#1e3d32" stroke-width="2" />
+          <polygon points="260,40 200,100 320,100" fill="none" stroke="#c9a227" stroke-width="1.5" />
+          <line x1="260" y1="40" x2="260" y2="100" stroke="#c9a227" />
+          <rect x="120" y="50" width="100" height="50" rx="3" fill="#1e3d32" opacity="0.85" />
+          <text x="170" y="70" text-anchor="middle" fill="#fff" font-size="9.5" font-weight="600">collateral&times;</text>
+          <text x="170" y="82" text-anchor="middle" fill="#f0e0a8" font-size="11">(LT, haircuts&hellip;)</text>
+          <rect x="300" y="60" width="100" height="40" rx="3" fill="#3d4a5c" />
+          <text x="350" y="82" text-anchor="middle" fill="#fff" font-size="9.5" font-weight="600">debt (USD)</text>
+          <text x="170" y="118" text-anchor="middle" font-size="11" fill="#5e6470" font-style="italic">when heavy &darr; HF&lt;1</text>
+          <text x="350" y="118" text-anchor="middle" font-size="11" fill="#5e6470" font-style="italic">when light &uarr; HF&gg;1</text>
+        </svg>
+        <p class="cap">The real formula is in <code>docs/LIQUIDATION.md</code>; the drawing is <strong>intuition</strong> only.</p>
+      </div>
+
+      <h2 id="s9" class="page-break"><span class="num">9.</span> Liquidations, penalties, bad debt</h2>
+      <p><strong>Liquidations</strong> exist to protect lenders (and the protocol&rsquo;s LPs / stability). A liquidator repays a slice (or, under conditions, the totality) of the borrower&rsquo;s debt in return for a slice of collateral that includes a <strong>penalty / spread</strong> to compensate for execution risk. Advanced markets may have <strong>close factors</strong> (cannot unwind everything in one go unless HF is very bad), <strong>protocol fee on seized collateral</strong>, and an optional <strong>Dutch-style auction of the penalty</strong> so early liquidators get less of a bonus than late ones in stressed markets (documented in <code>docs/LIQUIDATION.md</code>).</p>
+
+      <div class="figure-row" aria-hidden="true">
+        <div class="figure">
+          <svg width="300" height="220" viewBox="0 0 300 220" xmlns="http://www.w3.org/2000/svg">
+            <text x="150" y="16" text-anchor="middle" font-size="14" font-weight="600" fill="#1e3d32">Liquidation (simplified flow)</text>
+            <text x="150" y="32" text-anchor="middle" font-size="9.5" fill="#5e6470" font-weight="600">tx call</text>
+            <rect x="12" y="42" width="108" height="40" rx="4" fill="#5c2a2a" />
+            <text x="66" y="60" text-anchor="middle" fill="#fff" font-size="9.5" font-weight="600">Borrower</text>
+            <text x="66" y="76" text-anchor="middle" fill="#ffc9c9" font-size="10">HF &lt; 1</text>
+            <line x1="120" y1="62" x2="162" y2="62" stroke="#c9a227" stroke-width="2" />
+            <rect x="162" y="42" width="126" height="40" rx="4" fill="#1e3d32" />
+            <text x="225" y="60" text-anchor="middle" fill="#fff" font-size="9.5" font-weight="600">Liquidator</text>
+            <text x="225" y="76" text-anchor="middle" fill="#e0e8e4" font-size="10">pays ceitUSD</text>
+            <line x1="150" y1="95" x2="150" y2="110" stroke="#b8c4be" />
+            <line x1="60" y1="120" x2="240" y2="120" stroke="#1e3d32" />
+            <text x="150" y="115" text-anchor="middle" font-size="10" fill="#5e6470" font-weight="600">receives + penalty</text>
+            <rect x="50" y="130" width="80" height="32" rx="3" fill="#2a5244" />
+            <text x="90" y="148" text-anchor="middle" fill="#fff" font-size="10" font-weight="600">debt &darr;</text>
+            <rect x="170" y="130" width="80" height="32" rx="3" fill="#3d4a5c" />
+            <text x="210" y="148" text-anchor="middle" fill="#fff" font-size="10" font-weight="600">coll. partial</text>
+            <text x="150" y="180" text-anchor="middle" font-size="9.5" fill="#5e6470" font-style="italic">close factor / multi-step in deep stress</text>
+            <text x="150" y="200" text-anchor="middle" font-size="9.5" fill="#5e6470" font-style="italic">optional Dutch: early vs late bonus</text>
+          </svg>
+        </div>
+        <div class="figure">
+          <svg width="300" height="220" viewBox="0 0 300 220" xmlns="http://www.w3.org/2000/svg">
+            <text x="150" y="16" text-anchor="middle" font-size="14" font-weight="600" fill="#1e3d32">Bad debt (concept)</text>
+            <text x="150" y="40" text-anchor="middle" font-size="9.5" fill="#5e6470" font-style="italic">In tail events, seized $ may &lt; remaining debt</text>
+            <rect x="70" y="50" width="160" height="36" rx="4" fill="#1e3d32" />
+            <text x="150" y="72" text-anchor="middle" fill="#fff" font-size="11" font-weight="600">seized collateral $</text>
+            <line x1="100" y1="100" x2="100" y2="115" stroke="#b8c4be" />
+            <line x1="200" y1="100" x2="200" y2="115" stroke="#b8c4be" />
+            <line x1="40" y1="115" x2="260" y2="115" stroke="#2a5244" stroke-width="1.2" />
+            <text x="100" y="133" text-anchor="middle" font-size="10" fill="#1e3d32" font-weight="600">try reserves</text>
+            <text x="200" y="133" text-anchor="middle" font-size="10" fill="#5e6470">residual = loss to DAO / LPs</text>
+            <rect x="25" y="145" width="250" height="58" rx="4" fill="#fff4e0" stroke="#c9a227" />
+            <text x="150" y="168" text-anchor="middle" font-size="10.5" font-weight="600" fill="#6b3a2a">totalReserves (buffer)</text>
+            <text x="150" y="186" text-anchor="middle" font-size="9.5" fill="#5e6470">IRM reserve + fees fund this, not &ldquo;magic&rdquo;</text>
+            <text x="150" y="210" text-anchor="middle" font-size="8.5" fill="#5e6470" font-style="italic">Many tails at once: caps + governance</text>
+          </svg>
+        </div>
+      </div>
+
+      <p><strong>Bad debt</strong> is the residual when collateral cannot cover the remaining debt. The protocol can attempt to cover from <code>totalReserves</code>; the uncovered remainder is recognized as a loss event. This is why <strong>reserves, caps, and conservative oracles</strong> matter: they are the shock absorbers.</p>
+
+      <h2 id="s10"><span class="num">10.</span> Markets, caps, isolation</h2>
+      <p>Each <code>marketId</code> is a <strong>bundle</strong> of: vault, oracle, risk, IRM, optional liquidation add-ons, and <strong>supply/borrow caps</strong>. <strong>Isolation mode</strong> is a firewall: some collateral types should not be cross-margined with the rest, because their correlation, oracle quality, or governance surface is different. Use isolation for <strong>long-tail</strong> or <strong>experimental</strong> collaterals.</p>
+
+      <div class="figure" aria-hidden="true">
+        <svg width="560" height="150" viewBox="0 0 560 150" xmlns="http://www.w3.org/2000/svg">
+          <text x="280" y="14" text-anchor="middle" font-size="15.5" font-weight="600" fill="#1e3d32">Cross-margin vs isolated (per user)</text>
+          <text x="110" y="32" text-anchor="middle" font-size="11" font-weight="600" fill="#2a5244">Cross (example)</text>
+          <rect x="30" y="40" width="50" height="18" rx="2" fill="#1e3d32" />
+          <text x="55" y="50" text-anchor="middle" fill="#fff" font-size="10">A</text>
+          <text x="55" y="64" text-anchor="middle" font-size="9.5" fill="#5e6470">mkt1</text>
+          <rect x="90" y="40" width="50" height="18" rx="2" fill="#1e3d32" />
+          <text x="115" y="50" text-anchor="middle" fill="#fff" font-size="10">B</text>
+          <line x1="80" y1="49" x2="90" y2="49" stroke="#c9a227" />
+          <text x="80" y="80" text-anchor="middle" font-size="9.5" fill="#5e6470" font-style="italic">one HF; collateral legs combined</text>
+          <line x1="200" y1="60" x2="240" y2="60" stroke="#e2e5ec" stroke-width="1.2" />
+          <line x1="200" y1="70" x2="240" y2="50" stroke="#e2e5ec" stroke-width="1.2" />
+          <text x="130" y="100" text-anchor="middle" font-size="9.5" fill="#1e3d32" font-weight="600">&uarr; capital efficiency, &darr; separation</text>
+          <text x="430" y="32" text-anchor="middle" font-size="11" font-weight="600" fill="#2a5244">Isolated mkt2</text>
+          <rect x="330" y="40" width="100" height="30" rx="3" fill="#1e3d32" />
+          <text x="380" y="55" text-anchor="middle" fill="#fff" font-size="10">A only mkt2</text>
+          <rect x="400" y="80" width="100" height="20" fill="#f0f0f0" stroke="#8b1a1a" stroke-dasharray="2 1" />
+          <text x="450" y="90" text-anchor="middle" font-size="9.5" fill="#5e6470">B &nleftrightarrow; mkt1 risk</text>
+          <line x1="350" y1="75" x2="480" y2="100" stroke="#8b1a1a" stroke-dasharray="1 1" />
+          <text x="380" y="120" text-anchor="middle" font-size="9.5" fill="#5e6470" font-style="italic">use for new vaults, weak oracles, governance experiments</text>
+        </svg>
+        <p class="cap">Actual isolation rules: read <code>MarketRegistry</code> flags and the doc for the deployment you use.</p>
+      </div>
+
+      <h2 id="s11"><span class="num">11.</span> ceitUSD, PSM, Router, Treasury</h2>
+      <p><strong>ceitUSD</strong> (CDP): minted when the engine issues debt, burned on repay. Minter rights are a security perimeter &mdash; production deployments usually route changes through <strong>governance and timelock</strong>, not a single EOA.</p>
+      <p><strong>PSM</strong> addresses <strong>peg</strong> needs: 1:1-style swaps with small fees, accumulating fee reserves the DAO can move under policy. <strong>Router</strong> (if deployed) composes user intents like deposit+borrow in one go. <strong>Treasury</strong> is the protocol&rsquo;s long-term value sink for fees and strategic programs.</p>
+
+      <div class="figure" aria-hidden="true">
+        <svg width="560" height="170" viewBox="0 0 560 170" xmlns="http://www.w3.org/2000/svg">
+          <text x="280" y="16" text-anchor="middle" font-size="15.5" font-weight="600" fill="#1e3d32">ceitUSD: CDP vs PSM (two sides of the stable)</text>
+          <rect x="30" y="40" width="200" height="50" rx="5" fill="#1e3d32" />
+          <text x="130" y="60" text-anchor="middle" fill="#fff" font-size="10.5" font-weight="600">CDP (engine)</text>
+          <text x="130" y="75" text-anchor="middle" fill="#e0e8e4" font-size="11">borrow: mint &bull; repay: burn</text>
+          <text x="130" y="88" text-anchor="middle" fill="#f0e0a8" font-size="10">tied to position</text>
+          <rect x="330" y="40" width="200" height="50" rx="5" fill="#3d2e20" />
+          <text x="430" y="60" text-anchor="middle" fill="#fff" font-size="10.5" font-weight="600">PSM (optional)</text>
+          <text x="430" y="75" text-anchor="middle" fill="#e8d4a8" font-size="11">e.g. USDC &harr; ceitUSD</text>
+          <text x="430" y="88" text-anchor="middle" fill="#e8c97a" font-size="10">fees: tin (in) / tout (out)</text>
+          <line x1="130" y1="110" x2="430" y2="110" stroke="#c9a227" stroke-dasharray="3 1" />
+          <text x="280" y="105" text-anchor="middle" font-size="10" fill="#5e6470" font-style="italic">peg / liquidity bridge &mdash; not the same as collateral borrow</text>
+          <text x="280" y="128" text-anchor="middle" font-size="10" fill="#1e3d32" font-weight="600">Router: batch deposit+borrow in one user tx (UX)</text>
+          <text x="280" y="145" text-anchor="middle" font-size="9" fill="#5e6470">Treasury: fees, grants, long-term program envelope (policy)</text>
+        </svg>
+        <p class="cap">Minter keys on <code>CeitnotUSD</code> and PSM are <strong>governance- or timelock-gated</strong> in a serious deployment.</p>
+      </div>
+
+      <h2 id="s12"><span class="num">12.</span> Governance, timelock, upgradeability</h2>
+      <p><strong>CEITNOT</strong> and <strong>ve locking</strong> create long-horizon voting power; <strong>revenue</strong> may be streamed to ve holders by policy. The <strong>Governor + Timelock</strong> pattern is standard: a passed vote is <strong>queued</strong> and <strong>executed after a delay</strong>, giving the community a window to verify calldata, migrate off risky positions, and react to malicious or mistaken proposals. The <strong>engine is behind a UUPS proxy</strong> with <strong>namespaced storage (EIP-7201)</strong> to allow implementation upgrades with cleaner safety reviews than a flat storage contract.</p>
+
+      <div class="figure" aria-hidden="true">
+        <svg width="620" height="198" viewBox="0 0 620 198" xmlns="http://www.w3.org/2000/svg">
+          <text x="310" y="18" text-anchor="middle" font-size="15.5" font-weight="600" fill="#1e3d32">Governance + upgrade path (high level)</text>
+          <rect x="8" y="40" width="68" height="32" rx="4" fill="#1e3d32" />
+          <text x="42" y="58" text-anchor="middle" fill="#fff" font-size="10.5" font-weight="600">CEITNOT</text>
+          <line x1="76" y1="56" x2="92" y2="56" stroke="#c9a227" stroke-width="2" />
+          <text x="84" y="34" text-anchor="middle" font-size="9.5" fill="#2a5244" font-weight="600">lock</text>
+          <rect x="92" y="40" width="52" height="32" rx="4" fill="#2a5244" />
+          <text x="118" y="58" text-anchor="middle" fill="#fff" font-size="11" font-weight="600">ve</text>
+          <line x1="144" y1="56" x2="160" y2="56" stroke="#c9a227" stroke-width="2" />
+          <text x="152" y="34" text-anchor="middle" font-size="9.5" fill="#2a5244" font-weight="600">power</text>
+          <rect x="160" y="36" width="120" height="40" rx="4" fill="#3d4a5c" />
+          <text x="220" y="54" text-anchor="middle" fill="#fff" font-size="10.5" font-weight="600">Governor</text>
+          <text x="220" y="68" text-anchor="middle" fill="#dbe0e8" font-size="9">proposals / vote</text>
+          <line x1="280" y1="56" x2="300" y2="56" stroke="#c9a227" stroke-width="2" />
+          <text x="290" y="34" text-anchor="middle" font-size="9.5" fill="#2a5244" font-weight="600">queue</text>
+          <rect x="300" y="36" width="112" height="40" rx="4" fill="#2a1e10" />
+          <text x="356" y="54" text-anchor="middle" fill="#fff" font-size="10.5" font-weight="600">Timelock</text>
+          <text x="356" y="68" text-anchor="middle" fill="#e8c97a" font-size="9">delay &Delta;t</text>
+          <line x1="356" y1="76" x2="356" y2="88" stroke="#b8c4be" stroke-width="1.5" />
+          <line x1="100" y1="88" x2="520" y2="88" stroke="#b8c4be" stroke-width="1.2" />
+          <line x1="100" y1="88" x2="100" y2="100" stroke="#b8c4be" />
+          <line x1="310" y1="88" x2="310" y2="100" stroke="#b8c4be" />
+          <line x1="520" y1="88" x2="520" y2="100" stroke="#b8c4be" />
+          <rect x="20" y="100" width="160" height="40" rx="3" fill="#1e3d32" />
+          <text x="100" y="118" text-anchor="middle" fill="#fff" font-size="9.5" font-weight="600">set params (registry&hellip;)</text>
+          <text x="100" y="132" text-anchor="middle" fill="#e0e8e4" font-size="8.5">risk / caps / oracles</text>
+          <rect x="230" y="100" width="160" height="40" rx="3" fill="#1e3d32" />
+          <text x="310" y="118" text-anchor="middle" fill="#fff" font-size="9.5" font-weight="600">UUPS: new impl</text>
+          <text x="310" y="132" text-anchor="middle" fill="#e0e8e4" font-size="8.5">upgrade engine</text>
+          <rect x="440" y="100" width="160" height="40" rx="3" fill="#1e3d32" />
+          <text x="520" y="118" text-anchor="middle" fill="#fff" font-size="9.5" font-weight="600">minter / roles</text>
+          <text x="520" y="132" text-anchor="middle" fill="#e0e8e4" font-size="8.5">ceitUSD, PSM, &hellip;</text>
+          <text x="310" y="170" text-anchor="middle" font-size="9.5" fill="#5e6470" font-style="italic">EIP-7201 namespaced storage: fewer slot clashes on upgrades</text>
+        </svg>
+        <p class="cap">Voters should read <strong>raw calldata</strong> in the block explorer before the delay elapses. Social consensus is a security layer, not a substitute for review.</p>
+      </div>
+
+      <h2 id="s13" class="page-break"><span class="num">13.</span> Security model (overview)</h2>
+      <p>On-chain money systems fail for predictable reasons. Ceitnot mitigates several classes:</p>
+      <ul>
+        <li><strong>Oracle risk</strong> &mdash; multiple feeds, staleness checks, optional TWAP / median / circuit breakers in relay variants; never trust a single DEX print for the whole market.</li>
+        <li><strong>Same-block re-entrancy / flash abuse</strong> &mdash; per-position, same-block interaction guards on sensitive paths to reduce flash-loan shaped attacks.</li>
+        <li><strong>Admin risk</strong> &mdash; timelock + transparent governance, production checklist for role holders.</li>
+        <li><strong>Code risk</strong> &mdash; tests, audits, bug bounty. Read <code>docs/SECURITY-AUDIT.md</code> in the repo; this lightpaper is not a substitute for security reporting.</li>
+      </ul>
+
+      <div class="figure" aria-hidden="true">
+        <svg width="540" height="152" viewBox="0 0 540 152" xmlns="http://www.w3.org/2000/svg">
+          <text x="270" y="16" text-anchor="middle" font-size="14" font-weight="600" fill="#1e3d32">Defense in depth (not exhaustive)</text>
+          <rect x="20" y="32" width="500" height="24" rx="3" fill="#1e3d32" opacity="0.12" />
+          <text x="270" y="48" text-anchor="middle" font-size="9.5" font-weight="600" fill="#1e3d32">1. Economic: LTV/LT, caps, reserves, Siphon vs IRM</text>
+          <rect x="20" y="60" width="500" height="24" rx="3" fill="#2a5244" opacity="0.15" />
+          <text x="270" y="76" text-anchor="middle" font-size="9.5" font-weight="600" fill="#1e3d32">2. Oracles: feeds, TWAP/median, heartbeat</text>
+          <rect x="20" y="88" width="500" height="24" rx="3" fill="#3d4a5c" opacity="0.12" />
+          <text x="270" y="104" text-anchor="middle" font-size="9.5" font-weight="600" fill="#1e3d32">3. On-chain: reentrancy / same-tx checks, Pausable</text>
+          <rect x="20" y="116" width="500" height="24" rx="3" fill="#4a2a2a" opacity="0.1" />
+          <text x="270" y="132" text-anchor="middle" font-size="9.5" font-weight="600" fill="#1e3d32">4. Process: timelock, audit, bug bounty, monitoring</text>
+        </svg>
+        <p class="cap">A diagram cannot prove safety; it only orders <strong>where</strong> to look. Verify against the specific deployment and threat model you care about.</p>
+      </div>
+
+      <h2 id="s14"><span class="num">14.</span> What Ceitnot is <em>not</em></h2>
+      <ul>
+        <li>Not a guarantee of <strong>positive</strong> net carry &mdash; borrow rates and price moves can dominate vault yield.</li>
+        <li>Not a replacement for <strong>credit assessment</strong> in the off-chain, legal, or RWA sense &mdash; it is a <strong>permissionless, over-collateralized on-chain</strong> system.</li>
+        <li>Not &ldquo;no liquidation risk&rdquo; for volatile LST / ETH &mdash; use conservative LTV and monitor HF.</li>
+        <li>Not an endorsement of any specific vault partner &mdash; each ERC-4626 has its own counterparty, smart contract, and depeg path.</li>
+      </ul>
+
+      <h2 id="s15"><span class="num">15.</span> FAQ</h2>
+      <div class="faq">
+        <q>Is the frontend custodial?</q>
+        <p><strong>No.</strong> The browser dapp only proposes transactions. Your private keys never leave the wallet. The backend, if any, is typically for config, stats, and CORS-friendly RPC &mdash; not for custody.</p>
+        <q>Does Siphon work if I do not call harvest?</q>
+        <p><strong>Your debt will still be updated to the new scale on your next interaction</strong> (or when someone else harvests for the market). The harvest is a <em>public good</em> &mdash; often bots/keepers or the protocol team call it, subject to the heartbeat. If no one calls it, you still settle when you touch your position, but the <strong>public scale</strong> will not move until a successful harvest path runs.</p>
+        <q>Are borrow APR and Siphon the same &ldquo;yield&rdquo;?</q>
+        <p><strong>No.</strong> Borrow APR is a <strong>cost of debt</strong> set by the IRM. Siphon is a <strong>credit from collateral revaluation and vault yield</strong> to the market&rsquo;s effective debt. Think &ldquo;left pocket / right pocket&rdquo; in accounting terms.</p>
+        <q>Can governance brick my position?</q>
+        <p>Governance can change <strong>future</strong> parameters. Existing positions are constrained by the rules at execution time, but you should <strong>monitor proposals</strong> &mdash; this is the social layer of all DAO protocols.</p>
+      </div>
+
+      <h2 id="s16"><span class="num">16.</span> Disclaimer</h2>
+      <p class="tiny">This document is an educational overview of the <strong>intended design</strong> of the Ceitnot protocol. It is <strong>not</strong> investment, legal, or tax advice. Smart contracts can contain bugs; parameters differ per deployment; markets can be volatile. <strong>Do your own research</strong> and verify addresses, parameters, and oracles on-chain before depositing or borrowing.</p>
+      <p class="tiny" style="margin-top:0.4rem">Source file: <code>docs/CEITNOT-LIGHTPAPER.html</code> &mdash; for PDF export, use Chrome &ldquo;Print to PDF&rdquo; with background graphics enabled.</p>
+
+      <footer style="margin-top:1.4rem; padding-top:0.7rem; border-top:1px solid var(--line); font-size:0.8rem; color: var(--soft); text-align: center;">Ceitnot Protocol</footer>
+    </div>
+  </div>
+</body>
+</html>

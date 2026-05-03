@@ -12,6 +12,7 @@ import GovernancePage from './pages/GovernancePage';
 import RewardsPage from './pages/RewardsPage';
 import SwapPage from './pages/SwapPage';
 import SecurityPage from './pages/SecurityPage';
+import LightpaperPage from './pages/LightpaperPage';
 
 export default function App() {
   return (
@@ -30,6 +31,7 @@ export default function App() {
             <Route path="/swap" element={<SwapPage />} />
             <Route path="/liquidate" element={<LiquidatePage />} />
             <Route path="/security" element={<SecurityPage />} />
+            <Route path="/lightpaper" element={<LightpaperPage />} />
             <Route path="/admin" element={<AdminPage />} />
           </Routes>
         </main>

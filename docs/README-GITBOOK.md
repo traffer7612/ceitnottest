@@ -8,6 +8,8 @@
 
 | Документ | Описание |
 |----------|----------|
+| [INTRODUCTION.md](INTRODUCTION.md) | Введение для GitBook: экосистема (Engine, ceitUSD/PSM, governance), обзор разделов документации. |
+| [CEITNOT-LIGHTPAPER.html](CEITNOT-LIGHTPAPER.html) | Lightpaper (EN, HTML+SVG, expanded): problem/solution, contract map, glossary, user journey, deep dive on Yield Siphon vs IRM, HF, liquidations, markets, PSM, governance, security overview, FAQ; print to PDF from Chrome. |
 | [INTEREST-RATES.md](INTEREST-RATES.md) | Математика процентных ставок (kink-модель, утилизация, RAY/WAD). |
 | [LIQUIDATION.md](LIQUIDATION.md) | Механика ликвидации: Health Factor, кто ликвидирует, bad debt. |
 | [SMART-CONTRACTS.md](SMART-CONTRACTS.md) | Смарт-контракты и адреса (Sepolia и др. сети). |

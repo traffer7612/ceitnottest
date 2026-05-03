@@ -54,6 +54,9 @@ export default function SiteFooter() {
           <Link to="/security" className="hover:text-ceitnot-gold transition-colors">
             Security
           </Link>
+          <Link to="/lightpaper" className="hover:text-ceitnot-gold transition-colors">
+            Lightpaper
+          </Link>
           <a
             href={DOCS_TREE_URL}
             target="_blank"

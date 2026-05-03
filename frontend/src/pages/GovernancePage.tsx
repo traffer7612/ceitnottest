@@ -24,10 +24,15 @@ const TALLY_URL = import.meta.env.VITE_TALLY_URL as string | undefined;
 const ceitusdGovAbi = [
   { type: 'function', name: 'addMinter', stateMutability: 'nonpayable', inputs: [{ name: 'minter', type: 'address' }], outputs: [] },
 ] as const;
+/** Minimal ABI for two-step admin contracts (accept side). */
+const proposableAdminAbi = [
+  { type: 'function', name: 'acceptAdmin', stateMutability: 'nonpayable', inputs: [], outputs: [] },
+] as const;
 
 const WEEK = 7 * 24 * 3600;
 /** Max age of proposals shown in "Recent" (by block timestamp). */
 const FEED_WINDOW_SECONDS = 90 * 24 * 3600; // 90 days — was 10d; short window hid older active votes
+const PROPOSAL_FEED_FALLBACK_COUNT = 12;
 const ACTIVITY_INITIAL_COUNT = 5;
 
 /** Percent string (e.g. "90" = 90%) → basis points for registry */
@@ -201,7 +206,7 @@ export default function GovernancePage() {
   const [newLiqThreshold, setNewLiqThreshold] = useState('93');
   const [newLiqPenalty, setNewLiqPenalty] = useState('3');
   /** Which single-action template feeds propose / queue / execute (must stay the same for a given proposal). */
-  const [govProposalKind, setGovProposalKind] = useState<'marketRisk' | 'addMarket' | 'addPsmMinter'>('marketRisk');
+  const [govProposalKind, setGovProposalKind] = useState<'marketRisk' | 'addMarket' | 'addPsmMinter' | 'acceptAdminHandover'>('marketRisk');
   const [newPsmMinterAddress, setNewPsmMinterAddress] = useState('');
   const [addMarketVault, setAddMarketVault] = useState('');
   const [addMarketOracle, setAddMarketOracle] = useState('');
@@ -303,14 +308,32 @@ export default function GovernancePage() {
         args: [trimmedPsm as Address],
       })
       : '0x';
+  const psmAddress = viteAddress(import.meta.env.VITE_PSM_ADDRESS as string | undefined);
+  const treasuryAddress = viteAddress(import.meta.env.VITE_TREASURY_ADDRESS as string | undefined);
+  const acceptAdminTargets: Address[] =
+    GOVERNOR && engine && registry && psmAddress && CEITUSD && treasuryAddress
+      ? [engine, registry, psmAddress, CEITUSD, treasuryAddress]
+      : [];
+  const acceptAdminCalldatas: `0x${string}`[] =
+    acceptAdminTargets.length > 0
+      ? acceptAdminTargets.map(() =>
+          encodeFunctionData({
+            abi: proposableAdminAbi,
+            functionName: 'acceptAdmin',
+            args: [],
+          }),
+        ) as `0x${string}`[]
+      : [];
 
   const govTargets: Address[] =
     (govProposalKind === 'marketRisk' || govProposalKind === 'addMarket') && registry
       ? [registry as Address]
       : govProposalKind === 'addPsmMinter' && CEITUSD
         ? [CEITUSD]
+        : govProposalKind === 'acceptAdminHandover'
+          ? acceptAdminTargets
         : [];
-  const govValues: bigint[] = [0n];
+  const govValues: bigint[] = govTargets.map(() => 0n);
   const govCalldatas: `0x${string}`[] =
     govProposalKind === 'marketRisk' && marketRiskCalldata !== '0x'
       ? [marketRiskCalldata as `0x${string}`]
@@ -318,6 +341,8 @@ export default function GovernancePage() {
         ? [addMarketCalldataEncoded as `0x${string}`]
         : govProposalKind === 'addPsmMinter' && addMinterCalldata !== '0x'
           ? [addMinterCalldata as `0x${string}`]
+          : govProposalKind === 'acceptAdminHandover'
+            ? acceptAdminCalldatas
           : [];
   const canCreateGovProposal =
     !!GOVERNOR &&
@@ -333,7 +358,9 @@ export default function GovernancePage() {
           addLiqBps !== undefined &&
           addPenBps !== undefined &&
           addLiqBps >= addLtvBps
-        : !!CEITUSD && isAddress(trimmedPsm as Address));
+        : govProposalKind === 'addPsmMinter'
+          ? !!CEITUSD && isAddress(trimmedPsm as Address)
+          : acceptAdminTargets.length === 5 && acceptAdminCalldatas.length === 5);
 
   const { data: govData, refetch: refetchGov } = useReadContracts({
     contracts: (GOVERNOR ? [
@@ -392,6 +419,16 @@ export default function GovernancePage() {
   // ── helpers ──
   const gas = gasFor(chainId);
   const governanceGas = (chainId === 42161 || chainId === 421614) ? {} : gas;
+  const arbGovernanceExecutionGas =
+    chainId === 42161 || chainId === 421614
+      ? {
+          // MetaMask on Arb Sepolia may produce broken estimateGas for Governor queue/execute.
+          // Provide sane explicit caps to avoid absurd fee previews and allow signing.
+          gas: 1_500_000n,
+          maxFeePerGas: 200_000_000n, // 0.2 gwei
+          maxPriorityFeePerGas: 10_000_000n, // 0.01 gwei
+        }
+      : {};
   const parseAmt = (v: string) => { try { return v ? parseUnits(v, 18) : 0n; } catch { return 0n; } };
 
   async function approve() {
@@ -806,8 +843,12 @@ export default function GovernancePage() {
         if (b.timestamp >= minTs) createdRecent.push(log);
         if (createdRecent.length >= 12) break;
       }
-      const recent = createdRecent;
-      const withState = await Promise.all(recent.map(async (log) => {
+      let feedLogs = createdRecent;
+      if (feedLogs.length === 0) {
+        // Fallback: show latest known proposals even if they are older than FEED_WINDOW_SECONDS.
+        feedLogs = [...createdLogs].reverse().slice(0, PROPOSAL_FEED_FALLBACK_COUNT);
+      }
+      const withState = await Promise.all(feedLogs.map(async (log) => {
         const args = log.args as ProposalCreatedArgs;
         const cached = payloadById[args.proposalId.toString()];
         if (cached) return cached;
@@ -982,6 +1023,7 @@ export default function GovernancePage() {
         functionName: 'queue',
         args: [payload.targets, payload.values, payload.calldatas, keccak256(stringToHex(payload.description))],
         ...governanceGas,
+        ...arbGovernanceExecutionGas,
       });
       setHash(h);
     } catch (e: unknown) {
@@ -1014,6 +1056,7 @@ export default function GovernancePage() {
         functionName: 'execute',
         args: [payload.targets, payload.values, payload.calldatas, keccak256(stringToHex(payload.description))],
         ...governanceGas,
+        ...arbGovernanceExecutionGas,
       });
       setHash(h);
     } catch (e: unknown) {
@@ -1158,6 +1201,9 @@ export default function GovernancePage() {
           </p>
         ) : (
           <div className="space-y-3">
+            <p className="text-xs text-ceitnot-muted">
+              Showing latest proposals from recent window; if empty there, UI falls back to latest on-chain proposals so you can still use Vote/Queue/Execute.
+            </p>
             {proposalFeed.map((p) => (
               <div key={p.proposalId.toString()} className="rounded-xl border border-ceitnot-border p-3 bg-ceitnot-surface-2/80">
                 <div className="flex items-start justify-between gap-3">
@@ -1548,12 +1594,31 @@ export default function GovernancePage() {
                     className={`btn-secondary text-xs ${govProposalKind === 'addPsmMinter' ? 'ring-1 ring-ceitnot-gold' : ''}`}
                     disabled={isPending || !CEITUSD}
                   >ceitUSD add PSM minter</button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setGovProposalKind('acceptAdminHandover');
+                      setGovDescription('AIP: Accept admin handover to Timelock (Engine/Registry/PSM/ceitUSD/Treasury)');
+                    }}
+                    className={`btn-secondary text-xs ${govProposalKind === 'acceptAdminHandover' ? 'ring-1 ring-ceitnot-gold' : ''}`}
+                    disabled={isPending}
+                  >Accept admin handover</button>
                 </div>
                 {!registry && (govProposalKind === 'marketRisk' || govProposalKind === 'addMarket') && (
                   <p className="text-xs text-ceitnot-danger">Registry address missing — switch template or set <code className="font-mono">VITE_REGISTRY_ADDRESS</code>.</p>
                 )}
                 {!CEITUSD && govProposalKind === 'addPsmMinter' && (
                   <p className="text-xs text-ceitnot-danger">Set <code className="font-mono">VITE_CEITUSD_ADDRESS</code> (or legacy <code className="font-mono">VITE_AUSD_ADDRESS</code>) in <code className="font-mono">.env</code>.</p>
+                )}
+                {govProposalKind === 'acceptAdminHandover' && acceptAdminTargets.length !== 5 && (
+                  <p className="text-xs text-ceitnot-danger">
+                    Missing one of required env addresses for handover:
+                    <code className="font-mono"> VITE_ENGINE_ADDRESS</code>,
+                    <code className="font-mono"> VITE_REGISTRY_ADDRESS</code>,
+                    <code className="font-mono"> VITE_PSM_ADDRESS</code>,
+                    <code className="font-mono"> VITE_CEITUSD_ADDRESS</code> (or <code className="font-mono">VITE_AUSD_ADDRESS</code>),
+                    <code className="font-mono"> VITE_TREASURY_ADDRESS</code>.
+                  </p>
                 )}
                 {govProposalKind === 'addMarket' && registry && (
                   <p className="text-xs text-ceitnot-muted leading-relaxed">
@@ -1565,7 +1630,7 @@ export default function GovernancePage() {
 
                 <div className="space-y-2">
                   <p className="text-xs text-ceitnot-muted uppercase tracking-wider">
-                    1) Create proposal ({govProposalKind === 'marketRisk' ? 'market risk' : govProposalKind === 'addMarket' ? 'registry addMarket' : 'ceitUSD addMinter'})
+                    1) Create proposal ({govProposalKind === 'marketRisk' ? 'market risk' : govProposalKind === 'addMarket' ? 'registry addMarket' : govProposalKind === 'addPsmMinter' ? 'ceitUSD addMinter' : 'accept admin handover'})
                   </p>
                   {govProposalKind === 'marketRisk' ? (
                     <>
@@ -1620,7 +1685,7 @@ export default function GovernancePage() {
                         <p className="text-xs text-ceitnot-danger">Liquidation threshold must be ≥ LTV (registry rule).</p>
                       )}
                     </div>
-                  ) : (
+                  ) : govProposalKind === 'addPsmMinter' ? (
                     <div>
                       <label className="block text-xs text-ceitnot-muted mb-1">New PSM contract address</label>
                       <input
@@ -1632,6 +1697,15 @@ export default function GovernancePage() {
                         disabled={isPending}
                       />
                       <p className="text-xs text-ceitnot-muted mt-1">Calls <code className="font-mono">CeitnotUSD.addMinter(psm)</code> via Timelock after vote.</p>
+                    </div>
+                  ) : (
+                    <div className="p-3 rounded-xl bg-ceitnot-surface-2/80 text-xs text-ceitnot-muted space-y-1">
+                      <p>This proposal calls <code className="font-mono">acceptAdmin()</code> for:</p>
+                      <p className="font-mono">- Engine: {engine ?? '—'}</p>
+                      <p className="font-mono">- Registry: {registry ?? '—'}</p>
+                      <p className="font-mono">- PSM: {psmAddress ?? '—'}</p>
+                      <p className="font-mono">- ceitUSD: {CEITUSD ?? '—'}</p>
+                      <p className="font-mono">- Treasury: {treasuryAddress ?? '—'}</p>
                     </div>
                   )}
                   <input type="text" value={govDescription} onChange={e => setGovDescription(e.target.value)} placeholder="Proposal description" className="input-field w-full" disabled={isPending} />
