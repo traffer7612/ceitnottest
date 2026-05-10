@@ -38,16 +38,28 @@ const USER_COUNT_CACHE_MS = 120_000;
 type UserCountCache = { count: number; expires: number };
 const userCountCache = new Map<string, UserCountCache>();
 
-function deployBlockOrDefault(chainId: number): bigint | null {
+/** Canonical CeitnotProxy on Arbitrum One — creation block from deployment tx (see docs/PRODUCTION-ADDRESSES-ARBITRUM.md). */
+const ARBITRUM_ONE_ENGINE_PROXY_LOWER =
+  "0xf8631ea8d16f67a4ffbab691dcf55c6d0d31b928";
+const ARBITRUM_ONE_ENGINE_DEPLOY_BLOCK = 452727096n;
+
+function deployBlockOrDefault(chainId: number, engineAddress?: `0x${string}`): bigint | null {
   const raw = process.env.CEITNOT_ENGINE_DEPLOY_BLOCK?.trim();
   if (raw !== undefined && raw !== "") {
     try {
       return BigInt(raw);
     } catch {
-      return null;
+      /* fall through */
     }
   }
   if (chainId === 31337) return 0n;
+  if (
+    chainId === 42161 &&
+    engineAddress &&
+    engineAddress.toLowerCase() === ARBITRUM_ONE_ENGINE_PROXY_LOWER
+  ) {
+    return ARBITRUM_ONE_ENGINE_DEPLOY_BLOCK;
+  }
   return null;
 }
 
@@ -218,7 +230,7 @@ statsRouter.get("/:chainId", async (req, res) => {
       transport: http(getRpc(chainId)),
     });
 
-    const fromBlock = deployBlockOrDefault(chainId);
+    const fromBlock = deployBlockOrDefault(chainId, engineAddress);
     let uniqueUsers: number | null = null;
     if (fromBlock !== null) {
       const cacheKey = `${chainId}-${engineAddress}-${fromBlock}`;
