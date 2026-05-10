@@ -6,12 +6,22 @@ function normalizeEnvString(raw: string | undefined): string {
   return t.replace(/^['"]+|['"]+$/g, '').trim();
 }
 
-function parseEnvChainId(raw: string | undefined, fallback: number): number {
+export function parseEnvChainId(raw: string | undefined, fallback: number): number {
   const n = Number(normalizeEnvString(raw));
   return Number.isFinite(n) && n > 0 ? n : fallback;
 }
 
 export const TARGET_CHAIN_ID = parseEnvChainId(import.meta.env.VITE_CHAIN_ID as string | undefined, 31337);
+
+/**
+ * Chain id for landing-page `/api/stats/:chainId` (wallet count). Defaults to Arbitrum One so production matches Railway
+ * even when `VITE_CHAIN_ID` was never set on Vercel (otherwise it falls back to 31337 and hits the wrong stats route).
+ * Override with `VITE_STATS_CHAIN_ID` (e.g. testnet).
+ */
+export const LANDING_STATS_CHAIN_ID = parseEnvChainId(
+  import.meta.env.VITE_STATS_CHAIN_ID as string | undefined,
+  42161,
+);
 
 /**
  * Safe address from Vite env: trim whitespace; reject empty / invalid strings.

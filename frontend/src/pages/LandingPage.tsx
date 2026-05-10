@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowRight, Lock, Shield, Wallet, TrendingUp, Vote, Coins, ExternalLink, Users } from 'lucide-react';
-import { TARGET_CHAIN_ID, viteAddress, viteAddressLegacy } from '../lib/chainEnv';
+import { TARGET_CHAIN_ID, LANDING_STATS_CHAIN_ID, viteAddress, viteAddressLegacy } from '../lib/chainEnv';
 import { usePublicStats } from '../hooks/usePublicStats';
 import { blockExplorerAddressUrl } from '../lib/explorer';
 import {
@@ -136,23 +136,32 @@ function LineChartSvg() {
 }
 
 function ProtocolUsersLine() {
-  const { uniqueUsers, loading } = usePublicStats(TARGET_CHAIN_ID);
+  const { uniqueUsers, loading } = usePublicStats(LANDING_STATS_CHAIN_ID);
   return (
-    <p className="flex flex-wrap items-center justify-center gap-2 text-sm text-ceitnot-muted mb-8 px-2">
-      <Users size={16} className="text-ceitnot-gold shrink-0" aria-hidden />
-      {loading ? (
-        <span className="animate-pulse">Loading community stats…</span>
-      ) : uniqueUsers !== null ? (
-        <>
-          <span className="font-semibold text-ceitnot-ink tabular-nums">{uniqueUsers.toLocaleString()}</span>
-          <span className="text-ceitnot-muted-2">unique wallets have interacted with the protocol</span>
-        </>
-      ) : (
-        <span className="text-ceitnot-muted-2 max-w-md text-center">
-          Live wallet count isn&apos;t available yet (stats API or deploy block missing on the server).
-        </span>
-      )}
-    </p>
+    <div
+      className="mb-8 mx-auto max-w-lg rounded-xl border border-ceitnot-border bg-ceitnot-surface/60 px-4 py-3 shadow-sm"
+      role="region"
+      aria-label="Protocol usage stats"
+    >
+      <p className="text-[11px] uppercase tracking-wide text-ceitnot-muted text-center mb-1.5">On-chain activity</p>
+      <p className="flex flex-wrap items-center justify-center gap-2 text-sm text-ceitnot-muted">
+        <Users size={16} className="text-ceitnot-gold shrink-0" aria-hidden />
+        {loading ? (
+          <span className="animate-pulse">Loading community stats…</span>
+        ) : uniqueUsers !== null ? (
+          <>
+            <span className="font-semibold text-ceitnot-ink tabular-nums">{uniqueUsers.toLocaleString()}</span>
+            <span className="text-ceitnot-muted-2">unique wallets have interacted with the protocol</span>
+          </>
+        ) : (
+          <span className="text-ceitnot-muted-2 max-w-md text-center">
+            Live wallet count isn&apos;t available yet—set{' '}
+            <code className="font-mono text-[11px] px-1 rounded bg-ceitnot-surface-2">CEITNOT_ENGINE_DEPLOY_BLOCK</code> on
+            the API (Railway).
+          </span>
+        )}
+      </p>
+    </div>
   );
 }
 
