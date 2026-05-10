@@ -98,11 +98,81 @@ const arbitrumSepolia = defineChain({
   rpcUrls: { default: { http: ["https://sepolia-rollup.arbitrum.io/rpc"] } },
 });
 
-const CEITNOT_ENGINE_READ_ABI = [
-  { inputs: [], name: "totalDebt", outputs: [{ name: "", type: "uint256" }], stateMutability: "view", type: "function" },
-  { inputs: [], name: "totalCollateralAssets", outputs: [{ name: "", type: "uint256" }], stateMutability: "view", type: "function" },
-  { inputs: [], name: "asset", outputs: [{ name: "", type: "address" }], stateMutability: "view", type: "function" },
+const ENGINE_REGISTRY_ABI = [
+  {
+    inputs: [],
+    name: "marketRegistry",
+    outputs: [{ type: "address", name: "" }],
+    stateMutability: "view",
+    type: "function",
+  },
 ] as const;
+
+const REGISTRY_MARKET_COUNT_ABI = [
+  {
+    inputs: [],
+    name: "marketCount",
+    outputs: [{ type: "uint256", name: "" }],
+    stateMutability: "view",
+    type: "function",
+  },
+] as const;
+
+const ENGINE_PER_MARKET_ABI = [
+  {
+    inputs: [{ name: "marketId", type: "uint256" }],
+    name: "totalDebt",
+    outputs: [{ type: "uint256", name: "" }],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [{ name: "marketId", type: "uint256" }],
+    name: "totalCollateralAssets",
+    outputs: [{ type: "uint256", name: "" }],
+    stateMutability: "view",
+    type: "function",
+  },
+] as const;
+
+async function aggregateEngineTotals(
+  client: PublicClient,
+  engineAddress: `0x${string}`,
+): Promise<{ totalDebt: bigint; totalCollateralAssets: bigint }> {
+  const registry = await client.readContract({
+    address: engineAddress,
+    abi: ENGINE_REGISTRY_ABI,
+    functionName: "marketRegistry",
+  });
+  const count = await client.readContract({
+    address: registry,
+    abi: REGISTRY_MARKET_COUNT_ABI,
+    functionName: "marketCount",
+  });
+  const n = Number(count);
+  let td = 0n;
+  let tc = 0n;
+  for (let i = 0; i < n; i++) {
+    const mid = BigInt(i);
+    const [d, c] = await Promise.all([
+      client.readContract({
+        address: engineAddress,
+        abi: ENGINE_PER_MARKET_ABI,
+        functionName: "totalDebt",
+        args: [mid],
+      }),
+      client.readContract({
+        address: engineAddress,
+        abi: ENGINE_PER_MARKET_ABI,
+        functionName: "totalCollateralAssets",
+        args: [mid],
+      }),
+    ]);
+    td += d;
+    tc += c;
+  }
+  return { totalDebt: td, totalCollateralAssets: tc };
+}
 
 export const statsRouter = Router();
 
@@ -111,6 +181,10 @@ function getRpc(chainId: number): string {
     return process.env.FAUCET_RPC_URL ?? process.env.RPC_URL ?? "http://127.0.0.1:8545";
   }
   if (process.env.RPC_URL) return process.env.RPC_URL;
+  const arbitrumRpc = process.env.ARBITRUM_RPC_URL?.trim();
+  if (chainId === 42161 && arbitrumRpc) return arbitrumRpc;
+  const arbSepRpc = process.env.ARBITRUM_SEPOLIA_RPC_URL?.trim();
+  if (chainId === 421614 && arbSepRpc) return arbSepRpc;
   const rpcs: Record<number, string> = {
     11155111: "https://ethereum-sepolia.publicnode.com",
     42161: arbitrum.rpcUrls.default.http[0],
@@ -143,18 +217,6 @@ statsRouter.get("/:chainId", async (req, res) => {
       chain,
       transport: http(getRpc(chainId)),
     });
-    const [totalDebt, totalCollateralAssets] = await Promise.all([
-      client.readContract({
-        address: engineAddress,
-        abi: CEITNOT_ENGINE_READ_ABI,
-        functionName: "totalDebt",
-      }),
-      client.readContract({
-        address: engineAddress,
-        abi: CEITNOT_ENGINE_READ_ABI,
-        functionName: "totalCollateralAssets",
-      }),
-    ]);
 
     const fromBlock = deployBlockOrDefault(chainId);
     let uniqueUsers: number | null = null;
@@ -170,9 +232,19 @@ statsRouter.get("/:chainId", async (req, res) => {
       }
     }
 
+    let totalDebtStr = "0";
+    let totalCollateralStr = "0";
+    try {
+      const { totalDebt, totalCollateralAssets } = await aggregateEngineTotals(client, engineAddress);
+      totalDebtStr = formatEther(totalDebt);
+      totalCollateralStr = formatEther(totalCollateralAssets);
+    } catch {
+      /* wrong registry / RPC edge — keep zeros */
+    }
+
     return res.json({
-      totalDebt: formatEther(totalDebt),
-      totalCollateralAssets: formatEther(totalCollateralAssets),
+      totalDebt: totalDebtStr,
+      totalCollateralAssets: totalCollateralStr,
       uniqueUsers,
     });
   } catch (_e) {
