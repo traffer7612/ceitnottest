@@ -137,17 +137,20 @@ function LineChartSvg() {
 
 function ProtocolUsersLine() {
   const { uniqueUsers, loading } = usePublicStats(TARGET_CHAIN_ID);
-  if (!loading && uniqueUsers === null) return null;
   return (
     <p className="flex flex-wrap items-center justify-center gap-2 text-sm text-ceitnot-muted mb-8 px-2">
       <Users size={16} className="text-ceitnot-gold shrink-0" aria-hidden />
       {loading ? (
-        <span className="animate-pulse">Loading stats…</span>
-      ) : (
+        <span className="animate-pulse">Loading community stats…</span>
+      ) : uniqueUsers !== null ? (
         <>
-          <span className="font-semibold text-ceitnot-ink tabular-nums">{uniqueUsers!.toLocaleString()}</span>
+          <span className="font-semibold text-ceitnot-ink tabular-nums">{uniqueUsers.toLocaleString()}</span>
           <span className="text-ceitnot-muted-2">unique wallets have interacted with the protocol</span>
         </>
+      ) : (
+        <span className="text-ceitnot-muted-2 max-w-md text-center">
+          Live wallet count isn&apos;t available yet (stats API or deploy block missing on the server).
+        </span>
       )}
     </p>
   );

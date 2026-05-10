@@ -5,6 +5,10 @@
   "rewrites": [
     { "source": "/rpc", "destination": "https://arb1.arbitrum.io/rpc/" },
     { "source": "/rpc/:path*", "destination": "https://arb1.arbitrum.io/rpc/:path*" },
+    {
+      "source": "/api/(.*)",
+      "destination": "https://ceitnot-production.up.railway.app/api/$1"
+    },
     { "source": "/(.*)", "destination": "/index.html" }
   ]
 }
