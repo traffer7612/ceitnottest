@@ -1,14 +1,24 @@
 import { isAddress, type Address } from 'viem';
 
 /** Single source for VITE_CHAIN_ID (wagmi + contract reads). */
-export const TARGET_CHAIN_ID = Number(import.meta.env.VITE_CHAIN_ID ?? 31337);
+function normalizeEnvString(raw: string | undefined): string {
+  const t = typeof raw === 'string' ? raw.trim() : '';
+  return t.replace(/^['"]+|['"]+$/g, '').trim();
+}
+
+function parseEnvChainId(raw: string | undefined, fallback: number): number {
+  const n = Number(normalizeEnvString(raw));
+  return Number.isFinite(n) && n > 0 ? n : fallback;
+}
+
+export const TARGET_CHAIN_ID = parseEnvChainId(import.meta.env.VITE_CHAIN_ID as string | undefined, 31337);
 
 /**
  * Safe address from Vite env: trim whitespace; reject empty / invalid strings.
  * Prevents wagmi/viem from throwing when .env has typos, quotes, or placeholders.
  */
 export function viteAddress(raw: string | undefined): Address | undefined {
-  const v = typeof raw === 'string' ? raw.trim() : '';
+  const v = normalizeEnvString(raw);
   if (!v || !isAddress(v)) return undefined;
   return v as Address;
 }
@@ -24,10 +34,10 @@ export function viteAddressLegacy(primary: string | undefined, legacy: string | 
  */
 /** 8-decimal Chainlink-style USD price for mock ETH/USD (default 3000e8). Used when refreshing the Sepolia mock feed from the UI. */
 export function viteMockEthUsd8Dec(): bigint {
-  const raw = import.meta.env.VITE_MOCK_ETH_USD_8DEC;
-  if (typeof raw === 'string' && raw.trim()) {
+  const raw = normalizeEnvString(import.meta.env.VITE_MOCK_ETH_USD_8DEC as string | undefined);
+  if (raw) {
     try {
-      return BigInt(raw.trim());
+      return BigInt(raw);
     } catch {
       /* fall through */
     }
@@ -36,8 +46,8 @@ export function viteMockEthUsd8Dec(): bigint {
 }
 
 export function hiddenMarketIds(): Set<number> {
-  const raw = import.meta.env.VITE_HIDDEN_MARKET_IDS;
-  if (typeof raw !== 'string' || !raw.trim()) return new Set();
+  const raw = normalizeEnvString(import.meta.env.VITE_HIDDEN_MARKET_IDS as string | undefined);
+  if (!raw) return new Set();
   return new Set(
     raw
       .split(',')

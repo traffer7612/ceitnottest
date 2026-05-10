@@ -5,7 +5,7 @@ export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "");
   const chainId = Number(env.VITE_CHAIN_ID || "31337");
   const arbitrumRpc =
-    env.VITE_ARBITRUM_RPC_URL?.trim() || "https://arb1.arbitrum.io/rpc";
+    env.VITE_ARBITRUM_RPC_URL?.trim() || "https://arbitrum-one.publicnode.com";
   const arbitrumSepoliaRpc =
     env.VITE_ARBITRUM_SEPOLIA_RPC_URL?.trim() ||
     "https://sepolia-rollup.arbitrum.io/rpc";

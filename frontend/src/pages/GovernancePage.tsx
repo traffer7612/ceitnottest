@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useAccount, useWriteContract, useWaitForTransactionReceipt, useReadContracts, usePublicClient } from 'wagmi';
 import { parseUnits, formatUnits, encodeFunctionData, keccak256, stringToHex, isAddress, parseAbiItem, type Hash, type Address } from 'viem';
 import { ConnectButton } from '@rainbow-me/rainbowkit';
@@ -30,10 +30,60 @@ const proposableAdminAbi = [
 ] as const;
 
 const WEEK = 7 * 24 * 3600;
-/** Max age of proposals shown in "Recent" (by block timestamp). */
-const FEED_WINDOW_SECONDS = 90 * 24 * 3600; // 90 days — was 10d; short window hid older active votes
 const PROPOSAL_FEED_FALLBACK_COUNT = 12;
+const PROPOSAL_STATE_LOOKUP_LIMIT = 40;
 const ACTIVITY_INITIAL_COUNT = 5;
+const FEED_DEBUG_ERRORS_LIMIT = 10;
+/**
+ * Public RPCs can cap `eth_getLogs` block range (e.g. free-tier Infura on Arbitrum Sepolia).
+ * Fetch logs in bounded chunks and adapt chunk size when provider returns range-limit errors.
+ */
+const RPC_LOG_CHUNK_BY_CHAIN: Record<number, bigint> = {
+  42161: 50_000n,
+  421614: 50_000n,
+};
+
+const RPC_LOG_MAX_CHUNKS_BY_CHAIN: Record<number, number> = {
+  42161: 20,
+  421614: 64,
+};
+
+const RPC_LOG_DEEP_MAX_CHUNKS_BY_CHAIN: Record<number, number> = {
+  42161: 60,
+  421614: 220,
+};
+const RPC_LOG_SCAN_DURATION_MS_BY_CHAIN: Record<number, number> = {
+  42161: 14_000,
+  421614: 15_000,
+};
+const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000' as Address;
+
+function preferredLogChunk(chainId: number): bigint {
+  return RPC_LOG_CHUNK_BY_CHAIN[chainId] ?? 45_000n;
+}
+
+function maxLogChunks(chainId: number): number {
+  return RPC_LOG_MAX_CHUNKS_BY_CHAIN[chainId] ?? 120;
+}
+
+function maxDeepLogChunks(chainId: number): number {
+  return RPC_LOG_DEEP_MAX_CHUNKS_BY_CHAIN[chainId] ?? 300;
+}
+
+function preferredLogScanDurationMs(chainId: number): number {
+  return RPC_LOG_SCAN_DURATION_MS_BY_CHAIN[chainId] ?? 12_000;
+}
+
+function fallbackActivityFromBlock(latestBlock: bigint, chainId: number): bigint {
+  const spanByChain: Record<number, bigint> = {
+    421614: 120_000n,
+    42161: 400_000n,
+    8453: 300_000n,
+    11155111: 120_000n,
+  };
+  const span = spanByChain[chainId] ?? 150_000n;
+  return latestBlock > span ? latestBlock - span : 0n;
+}
 
 /** Percent string (e.g. "90" = 90%) → basis points for registry */
 function govPctToBps(v: string): number | undefined {
@@ -77,6 +127,35 @@ function governanceLogsDeepFromBlock(latestBlock: bigint, chainId: number): bigi
   };
   const span = spanByChain[chainId] ?? 1_000_000n;
   return latestBlock > span ? latestBlock - span : 0n;
+}
+
+function extractRangeLimitFromRpcError(err: unknown): bigint | undefined {
+  const bits = [
+    typeof (err as { shortMessage?: unknown })?.shortMessage === 'string'
+      ? (err as { shortMessage: string }).shortMessage
+      : '',
+    typeof (err as { details?: unknown })?.details === 'string'
+      ? (err as { details: string }).details
+      : '',
+    err instanceof Error ? err.message : String(err),
+  ]
+    .filter(Boolean)
+    .join(' ')
+    .toLowerCase();
+  const match =
+    bits.match(/ranges over\s+(\d+)\s+blocks/) ??
+    bits.match(/maximum block range[:\s]+(\d+)/) ??
+    bits.match(/exceed\s+maximum\s+block\s+range[:\s]+(\d+)/) ??
+    bits.match(/only allowed to search\s+(\d+)\s+blocks/) ??
+    bits.match(/requested logs from\s+(\d+)\s+blocks.*allowed to search\s+(\d+)\s+blocks/);
+  const limitRaw = match?.[2] ?? match?.[1];
+  if (!limitRaw) return undefined;
+  try {
+    const n = BigInt(limitRaw);
+    return n > 0n ? n : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 /** Duration presets in weeks */
@@ -134,6 +213,15 @@ type GovernanceActivityItem = {
   blockNumber?: bigint;
   logIndex?: number;
 };
+type SafeLogScanOptions = {
+  suppressErrors?: boolean;
+  chunkSize?: bigint;
+  maxChunks?: number;
+  stopWhenAtLeast?: number;
+  maxDurationMs?: number;
+  debugLabel?: string;
+  onDiagnostic?: (message: string) => void;
+};
 
 const proposalCreatedEvent = parseAbiItem(
   'event ProposalCreated(uint256 proposalId,address proposer,address[] targets,uint256[] values,string[] signatures,bytes[] calldatas,uint256 voteStart,uint256 voteEnd,string description)',
@@ -178,6 +266,7 @@ export default function GovernancePage() {
   const { address, isConnected, chainId } = useAccount();
   const explorerChainId = chainId ?? TARGET_CHAIN_ID;
   const publicClient = usePublicClient({ chainId: TARGET_CHAIN_ID });
+  const hasPublicClient = !!publicClient;
   const { writeContractAsync } = useWriteContract();
   const { engine, registry } = useContractAddresses();
 
@@ -224,6 +313,8 @@ export default function GovernancePage() {
   const [activityExpanded, setActivityExpanded] = useState(false);
   const [isFeedLoading, setIsFeedLoading] = useState(false);
   const [feedErr, setFeedErr] = useState('');
+  const [, setFeedDebugErrors] = useState<string[]>([]);
+  const feedRefreshInFlight = useRef(false);
 
   // ── read contract data ──
   const { data: readData, refetch } = useReadContracts({
@@ -564,7 +655,7 @@ export default function GovernancePage() {
   };
 
   const formatUnix = (v?: bigint) => {
-    if (v === undefined) return '—';
+    if (v === undefined || v === 0n) return '—';
     return new Date(Number(v) * 1000).toLocaleString();
   };
   const blockExplorerTxUrl = (txHash: string) => {
@@ -581,103 +672,273 @@ export default function GovernancePage() {
         return null;
     }
   };
+  const formatRpcFeedError = (e: unknown): string => {
+    const short =
+      typeof (e as { shortMessage?: unknown })?.shortMessage === 'string'
+        ? (e as { shortMessage: string }).shortMessage
+        : undefined;
+    const detailsRaw =
+      typeof (e as { details?: unknown })?.details === 'string'
+        ? (e as { details: string }).details
+        : undefined;
+    const details =
+      detailsRaw && !detailsRaw.includes('<!DOCTYPE html>')
+        ? detailsRaw.replace(/\s+/g, ' ').slice(0, 160)
+        : undefined;
+    const fallbackMsg = e instanceof Error ? e.message.split('\n')[0] : String(e);
+    if (short && details) return `${short} (${details})`;
+    return short ?? fallbackMsg;
+  };
+  const pushFeedDiagnostic = (message: string) => {
+    const normalized = message.replace(/\s+/g, ' ').trim().slice(0, 260);
+    if (!normalized) return;
+    setFeedDebugErrors((prev) => {
+      if (prev.includes(normalized)) return prev;
+      const next = [...prev, normalized];
+      return next.length > FEED_DEBUG_ERRORS_LIMIT
+        ? next.slice(next.length - FEED_DEBUG_ERRORS_LIMIT)
+        : next;
+    });
+  };
+  const getLogsWithSafeRange = async (
+    request: NonNullable<Parameters<NonNullable<typeof publicClient>['getLogs']>[0]>,
+    latestBlockHint?: bigint,
+    options?: SafeLogScanOptions,
+  ): Promise<any[]> => {
+    if (!publicClient) return [];
+    try {
+      const emitDiagnostic = (label: string, err?: unknown) => {
+        if (!options?.onDiagnostic) return;
+        const prefix = options?.debugLabel ? `[${options.debugLabel}] ` : '';
+        const details = err ? `: ${formatRpcFeedError(err)}` : '';
+        options.onDiagnostic(`${prefix}${label}${details}`);
+      };
+      const startedAt = Date.now();
+      const maxDurationMs = Math.max(500, options?.maxDurationMs ?? preferredLogScanDurationMs(TARGET_CHAIN_ID));
+      const resolvedToBlock =
+        request.toBlock === undefined || request.toBlock === 'latest'
+          ? (latestBlockHint ?? await publicClient.getBlockNumber())
+          : request.toBlock;
+      if (typeof resolvedToBlock !== 'bigint') {
+        return publicClient.getLogs(request);
+      }
+      const resolvedFromBlock = request.fromBlock;
+      if (typeof resolvedFromBlock !== 'bigint') {
+        return publicClient.getLogs({
+          ...request,
+          toBlock: resolvedToBlock,
+        } as Parameters<NonNullable<typeof publicClient>['getLogs']>[0]);
+      }
+      if (resolvedFromBlock > resolvedToBlock) return [];
+      const maxChunks = Math.max(1, options?.maxChunks ?? maxLogChunks(TARGET_CHAIN_ID));
+      let dynamicChunk = options?.chunkSize ?? preferredLogChunk(TARGET_CHAIN_ID);
+      if (dynamicChunk <= 0n) dynamicChunk = 1n;
+      let chunksFetched = 0;
+      let scanTo = resolvedToBlock;
+      const chunkedResults: any[][] = [];
+      let totalResults = 0;
+      let coveredEntireRange = false;
+      let stoppedByTargetCount = false;
+      while (scanTo >= resolvedFromBlock && chunksFetched < maxChunks) {
+        if (Date.now() - startedAt >= maxDurationMs) {
+          emitDiagnostic(`scan timed out after ${maxDurationMs}ms, returning partial results (${totalResults} logs)`);
+          return chunkedResults.reverse().flat();
+        }
+        let chunkFrom = scanTo >= (dynamicChunk - 1n) ? scanTo - dynamicChunk + 1n : 0n;
+        if (chunkFrom < resolvedFromBlock) chunkFrom = resolvedFromBlock;
+        // Retry this chunk with smaller ranges if provider rejects the window.
+        // eslint-disable-next-line no-constant-condition
+        while (true) {
+          if (Date.now() - startedAt >= maxDurationMs) {
+            emitDiagnostic(`scan timed out after ${maxDurationMs}ms, returning partial results (${totalResults} logs)`);
+            return chunkedResults.reverse().flat();
+          }
+          try {
+            const chunk = await publicClient.getLogs({
+              ...request,
+              fromBlock: chunkFrom,
+              toBlock: scanTo,
+            } as Parameters<NonNullable<typeof publicClient>['getLogs']>[0]);
+            chunkedResults.push(chunk);
+            totalResults += chunk.length;
+            break;
+          } catch (chunkErr: unknown) {
+            const span = scanTo - chunkFrom + 1n;
+            const parsedLimit = extractRangeLimitFromRpcError(chunkErr);
+            let nextSpan = parsedLimit ?? (span / 2n);
+            if (nextSpan >= span) nextSpan = span - 1n;
+            if (nextSpan < 1n) {
+              if (options?.suppressErrors) {
+                emitDiagnostic('rpc window reduction reached minimum, returning partial results', chunkErr);
+                return chunkedResults.reverse().flat();
+              }
+              if (chunkErr instanceof Error) throw chunkErr;
+              throw new Error(String(chunkErr));
+            }
+            emitDiagnostic(`rpc rejected span of ${span.toString()} blocks, retrying with ${nextSpan.toString()} blocks`, chunkErr);
+            dynamicChunk = nextSpan;
+            chunkFrom = scanTo >= (dynamicChunk - 1n) ? scanTo - dynamicChunk + 1n : 0n;
+            if (chunkFrom < resolvedFromBlock) chunkFrom = resolvedFromBlock;
+          }
+        }
+        chunksFetched += 1;
+        if (options?.stopWhenAtLeast && totalResults >= options.stopWhenAtLeast) {
+          stoppedByTargetCount = true;
+          break;
+        }
+        if (chunkFrom === resolvedFromBlock) {
+          coveredEntireRange = true;
+          break;
+        }
+        scanTo = chunkFrom - 1n;
+      }
+      if (!coveredEntireRange && !stoppedByTargetCount && scanTo >= resolvedFromBlock && chunksFetched >= maxChunks) {
+        emitDiagnostic(`scan reached max chunk limit (${maxChunks}), returning partial results (${totalResults} logs)`);
+      }
+      return chunkedResults.reverse().flat();
+    } catch (err: unknown) {
+      if (options?.suppressErrors) {
+        if (options?.onDiagnostic) {
+          const prefix = options?.debugLabel ? `[${options.debugLabel}] ` : '';
+          options.onDiagnostic(`${prefix}scan failed and was suppressed: ${formatRpcFeedError(err)}`);
+        }
+        return [];
+      }
+      if (err instanceof Error) throw err;
+      throw new Error(String(err));
+    }
+  };
 
   async function refreshProposalFeed() {
-    if (!publicClient || !GOVERNOR) return;
+    if (!publicClient || !GOVERNOR || feedRefreshInFlight.current) return;
+    feedRefreshInFlight.current = true;
     setIsFeedLoading(true);
     setFeedErr('');
+    setFeedDebugErrors([]);
     try {
       const latestBlock = await publicClient.getBlockNumber();
-      const latest = await publicClient.getBlock({ blockNumber: latestBlock });
-      const minTs = BigInt(Math.max(0, Number(latest.timestamp) - FEED_WINDOW_SECONDS));
       const fromBlock = governanceLogsFromBlock(latestBlock, TARGET_CHAIN_ID);
+      const proposalScanDurationMs = preferredLogScanDurationMs(TARGET_CHAIN_ID);
+      const eventScanDurationMs = Math.max(1_500, Math.floor(proposalScanDurationMs * 0.5));
+      const auxScanDurationMs = Math.max(1_000, Math.floor(proposalScanDurationMs * 0.35));
+      const includeExtendedActivity = TARGET_CHAIN_ID !== 42161;
+      const makeScanOptions = (
+        debugLabel: string,
+        base: Omit<SafeLogScanOptions, 'debugLabel' | 'onDiagnostic'>,
+      ): SafeLogScanOptions => ({
+        ...base,
+        debugLabel,
+        onDiagnostic: pushFeedDiagnostic,
+      });
       const adminSources = [engine, registry, CEITUSD, viteAddress(import.meta.env.VITE_PSM_ADDRESS)]
         .filter((x): x is Address => !!x);
-      const [createdLogs, voteLogs, queuedLogs, executedLogs, timelockScheduledLogs, timelockExecutedLogs, adminProposedByAddr, adminTransferredByAddr, minterUpdatedLogs] = await Promise.all([
-        publicClient.getLogs({
-          address: GOVERNOR,
-          event: proposalCreatedEvent,
-          fromBlock,
-          toBlock: 'latest',
+      const createdLogs = await getLogsWithSafeRange({
+        address: GOVERNOR,
+        event: proposalCreatedEvent,
+        fromBlock,
+        toBlock: 'latest',
+      }, latestBlock, {
+        ...makeScanOptions('ProposalCreated', {
+          suppressErrors: true,
+          maxChunks: maxDeepLogChunks(TARGET_CHAIN_ID),
+          stopWhenAtLeast: PROPOSAL_FEED_FALLBACK_COUNT + 4,
+          maxDurationMs: proposalScanDurationMs,
         }),
-        publicClient.getLogs({
+      });
+      const createdRecent = [...createdLogs].reverse().slice(0, PROPOSAL_FEED_FALLBACK_COUNT);
+      const quickTitles: Record<string, string> = {};
+      const quickPayloadById: Record<string, ProposalFeedItem> = {};
+      for (const log of createdLogs) {
+        const args = log.args as ProposalCreatedArgs;
+        quickTitles[args.proposalId.toString()] = humanizeProposalDescription(args.description);
+        const item = buildProposalFeedItemFromLog(log);
+        quickPayloadById[item.proposalId.toString()] = item;
+      }
+      if (createdRecent.length > 0) {
+        const quickFeed = createdRecent
+          .map((log) => {
+            const args = log.args as ProposalCreatedArgs;
+            return quickPayloadById[args.proposalId.toString()];
+          })
+          .filter((x): x is ProposalFeedItem => !!x);
+        setProposalTitleMap(quickTitles);
+        setProposalPayloadById(quickPayloadById);
+        setProposalFeed(quickFeed);
+      }
+      setIsFeedLoading(false);
+      const oldestCreatedBlock =
+        createdLogs.find((log) => typeof log.blockNumber === 'bigint')?.blockNumber;
+      const fallbackActivityBlock = fallbackActivityFromBlock(latestBlock, TARGET_CHAIN_ID);
+      const activityFromBlock =
+        oldestCreatedBlock && oldestCreatedBlock > fallbackActivityBlock
+          ? oldestCreatedBlock
+          : fallbackActivityBlock;
+      const [voteLogs, queuedLogs, executedLogs] = await Promise.all([
+        getLogsWithSafeRange({
           address: GOVERNOR,
           event: voteCastEvent,
-          fromBlock,
+          fromBlock: activityFromBlock,
           toBlock: 'latest',
-        }),
-        publicClient.getLogs({
+        }, latestBlock, makeScanOptions('VoteCast', { suppressErrors: true, maxChunks: maxLogChunks(TARGET_CHAIN_ID), stopWhenAtLeast: 40, maxDurationMs: eventScanDurationMs })),
+        getLogsWithSafeRange({
           address: GOVERNOR,
           event: proposalQueuedEvent,
-          fromBlock,
+          fromBlock: activityFromBlock,
           toBlock: 'latest',
-        }),
-        publicClient.getLogs({
+        }, latestBlock, makeScanOptions('ProposalQueued', { suppressErrors: true, maxChunks: maxLogChunks(TARGET_CHAIN_ID), stopWhenAtLeast: 20, maxDurationMs: eventScanDurationMs })),
+        getLogsWithSafeRange({
           address: GOVERNOR,
           event: proposalExecutedEvent,
-          fromBlock,
+          fromBlock: activityFromBlock,
           toBlock: 'latest',
-        }),
-        TIMELOCK ? publicClient.getLogs({
+        }, latestBlock, makeScanOptions('ProposalExecuted', { suppressErrors: true, maxChunks: maxLogChunks(TARGET_CHAIN_ID), stopWhenAtLeast: 20, maxDurationMs: eventScanDurationMs })),
+      ]);
+
+      let timelockScheduledLogs: any[] = [];
+      let timelockExecutedLogs: any[] = [];
+      if (TIMELOCK && includeExtendedActivity) {
+        timelockScheduledLogs = await getLogsWithSafeRange({
           address: TIMELOCK,
           event: timelockCallScheduledEvent,
-          fromBlock,
+          fromBlock: activityFromBlock,
           toBlock: 'latest',
-        }) : Promise.resolve([]),
-        TIMELOCK ? publicClient.getLogs({
+        }, latestBlock, makeScanOptions('TimelockCallScheduled', { suppressErrors: true, maxChunks: maxLogChunks(TARGET_CHAIN_ID), stopWhenAtLeast: 16, maxDurationMs: auxScanDurationMs }));
+        timelockExecutedLogs = await getLogsWithSafeRange({
           address: TIMELOCK,
           event: timelockCallExecutedEvent,
-          fromBlock,
+          fromBlock: activityFromBlock,
           toBlock: 'latest',
-        }) : Promise.resolve([]),
-        Promise.all(
-          adminSources.map((addr) => publicClient.getLogs({
-            address: addr,
-            event: adminProposedEvent,
-            fromBlock,
-            toBlock: 'latest',
-          })),
-        ),
-        Promise.all(
-          adminSources.map((addr) => publicClient.getLogs({
-            address: addr,
-            event: adminTransferredEvent,
-            fromBlock,
-            toBlock: 'latest',
-          })),
-        ),
-        GOV_TOKEN ? publicClient.getLogs({
-          address: GOV_TOKEN,
-          event: minterUpdatedEvent,
-          fromBlock,
+        }, latestBlock, makeScanOptions('TimelockCallExecuted', { suppressErrors: true, maxChunks: maxLogChunks(TARGET_CHAIN_ID), stopWhenAtLeast: 16, maxDurationMs: auxScanDurationMs }));
+      }
+
+      const adminProposedByAddr: any[][] = [];
+      const adminTransferredByAddr: any[][] = [];
+      for (const addr of includeExtendedActivity ? adminSources : []) {
+        // eslint-disable-next-line no-await-in-loop
+        const proposed = await getLogsWithSafeRange({
+          address: addr,
+          event: adminProposedEvent,
+          fromBlock: activityFromBlock,
           toBlock: 'latest',
-        }) : Promise.resolve([]),
-      ]);
+        }, latestBlock, makeScanOptions(`AdminProposed@${addr}`, { suppressErrors: true, maxChunks: maxLogChunks(TARGET_CHAIN_ID), stopWhenAtLeast: 8, maxDurationMs: auxScanDurationMs }));
+        // eslint-disable-next-line no-await-in-loop
+        const transferred = await getLogsWithSafeRange({
+          address: addr,
+          event: adminTransferredEvent,
+          fromBlock: activityFromBlock,
+          toBlock: 'latest',
+        }, latestBlock, makeScanOptions(`AdminTransferred@${addr}`, { suppressErrors: true, maxChunks: maxLogChunks(TARGET_CHAIN_ID), stopWhenAtLeast: 8, maxDurationMs: auxScanDurationMs }));
+        adminProposedByAddr.push(proposed);
+        adminTransferredByAddr.push(transferred);
+      }
+      const minterUpdatedLogs = GOV_TOKEN && includeExtendedActivity ? await getLogsWithSafeRange({
+        address: GOV_TOKEN,
+        event: minterUpdatedEvent,
+        fromBlock: activityFromBlock,
+        toBlock: 'latest',
+      }, latestBlock, makeScanOptions('MinterUpdated', { suppressErrors: true, maxChunks: maxLogChunks(TARGET_CHAIN_ID), stopWhenAtLeast: 12, maxDurationMs: auxScanDurationMs })) : [];
       const adminProposedLogs = adminProposedByAddr.flat();
       const adminTransferredLogs = adminTransferredByAddr.flat();
-
-      const stateIds = new Set<bigint>();
-      for (const lg of createdLogs) stateIds.add((lg.args as { proposalId: bigint }).proposalId);
-      for (const lg of voteLogs) stateIds.add((lg.args as { proposalId: bigint }).proposalId);
-      for (const lg of queuedLogs) stateIds.add((lg.args as { proposalId: bigint }).proposalId);
-      for (const lg of executedLogs) stateIds.add((lg.args as { proposalId: bigint }).proposalId);
-
-      const stateEntries = await Promise.all(
-        [...stateIds].map(async (proposalId) => {
-          try {
-            const st = await publicClient.readContract({
-              address: GOVERNOR,
-              abi: governorAbi,
-              functionName: 'state',
-              args: [proposalId],
-            });
-            return [proposalId, Number(st)] as const;
-          } catch {
-            return [proposalId, undefined] as const;
-          }
-        }),
-      );
-      const stateMap = new Map<bigint, number | undefined>(stateEntries);
 
       const rawActivity: GovernanceActivityItem[] = [
         ...createdLogs.map((log) => {
@@ -785,38 +1046,55 @@ export default function GovernancePage() {
         if (aBlock !== bBlock) return bBlock - aBlock;
         return (b.logIndex ?? 0) - (a.logIndex ?? 0);
       });
-
-      const isRecent = async (item: GovernanceActivityItem) => {
-        if (!item.blockNumber) return false;
-        const b = await publicClient.getBlock({ blockNumber: item.blockNumber });
-        return b.timestamp >= minTs;
-      };
-      const filteredByTime: GovernanceActivityItem[] = [];
+      const recentProposalIdsByActivity: bigint[] = [];
+      const seenRecentProposalIds = new Set<string>();
       for (const item of rawActivity) {
-        // Keep list small without parallel RPC bursts
-        // eslint-disable-next-line no-await-in-loop
-        if (await isRecent(item)) filteredByTime.push(item);
-        if (filteredByTime.length >= 30) break;
+        if (item.proposalId === undefined) continue;
+        const id = item.proposalId.toString();
+        if (seenRecentProposalIds.has(id)) continue;
+        seenRecentProposalIds.add(id);
+        recentProposalIdsByActivity.push(item.proposalId);
       }
+      const stateLookupIds = recentProposalIdsByActivity.slice(0, PROPOSAL_STATE_LOOKUP_LIMIT);
+      const stateEntries = await Promise.all(
+        stateLookupIds.map(async (proposalId) => {
+          try {
+            const st = await publicClient.readContract({
+              address: GOVERNOR,
+              abi: governorAbi,
+              functionName: 'state',
+              args: [proposalId],
+            });
+            return [proposalId, Number(st)] as const;
+          } catch {
+            return [proposalId, undefined] as const;
+          }
+        }),
+      );
+      const stateMap = new Map<bigint, number | undefined>(stateEntries);
+
 
       const proposalIdsShown = new Set(recentProposalIdsFromLogs(createdLogs));
-      const activity = filteredByTime
+      const activity = rawActivity
         .filter((a) => !(a.kind === 'proposed' && a.proposalId !== undefined && proposalIdsShown.has(a.proposalId.toString())))
         .slice(0, 20);
       setActivityFeed(activity);
-      const titles: Record<string, string> = {};
-      for (const log of createdLogs) {
-        const args = log.args as { proposalId: bigint; description: string };
-        titles[args.proposalId.toString()] = humanizeProposalDescription(args.description);
-      }
-      const missingTitleIds = [...stateIds].filter((id) => !titles[id.toString()]);
-      if (missingTitleIds.length > 0) {
+      const titles: Record<string, string> = { ...quickTitles };
+      const missingTitleIds = stateLookupIds.filter((id) => !titles[id.toString()]);
+      if (missingTitleIds.length > 0 && TARGET_CHAIN_ID !== 42161) {
         const deepFromBlock = governanceLogsDeepFromBlock(latestBlock, TARGET_CHAIN_ID);
-        const deepCreatedLogs = await publicClient.getLogs({
+        const deepCreatedLogs = await getLogsWithSafeRange({
           address: GOVERNOR,
           event: proposalCreatedEvent,
           fromBlock: deepFromBlock,
           toBlock: 'latest',
+        }, latestBlock, {
+          ...makeScanOptions('ProposalCreatedDeep', {
+            suppressErrors: true,
+            maxChunks: maxDeepLogChunks(TARGET_CHAIN_ID),
+            stopWhenAtLeast: Math.max(PROPOSAL_FEED_FALLBACK_COUNT, missingTitleIds.length),
+            maxDurationMs: eventScanDurationMs,
+          }),
         });
         for (const log of deepCreatedLogs) {
           const args = log.args as { proposalId: bigint; description: string };
@@ -835,38 +1113,54 @@ export default function GovernancePage() {
         payloadById[item.proposalId.toString()] = item;
       }
 
-      const createdRecent: typeof createdLogs = [];
-      for (const log of [...createdLogs].reverse()) {
-        if (!log.blockNumber) continue;
-        // eslint-disable-next-line no-await-in-loop
-        const b = await publicClient.getBlock({ blockNumber: log.blockNumber });
-        if (b.timestamp >= minTs) createdRecent.push(log);
-        if (createdRecent.length >= 12) break;
-      }
       let feedLogs = createdRecent;
       if (feedLogs.length === 0) {
         // Fallback: show latest known proposals even if they are older than FEED_WINDOW_SECONDS.
         feedLogs = [...createdLogs].reverse().slice(0, PROPOSAL_FEED_FALLBACK_COUNT);
       }
-      const withState = await Promise.all(feedLogs.map(async (log) => {
+      let withState = await Promise.all(feedLogs.map(async (log) => {
         const args = log.args as ProposalCreatedArgs;
         const cached = payloadById[args.proposalId.toString()];
         if (cached) return cached;
         return buildProposalFeedItemFromLog(log, stateMap.get(args.proposalId));
       }));
+      if (withState.length === 0 && recentProposalIdsByActivity.length > 0) {
+        withState = recentProposalIdsByActivity
+          .slice(0, PROPOSAL_FEED_FALLBACK_COUNT)
+          .map((proposalId) => {
+            const existing = payloadById[proposalId.toString()];
+            if (existing) return existing;
+            return {
+              proposalId,
+              proposer: ZERO_ADDRESS,
+              targets: [],
+              values: [],
+              calldatas: [],
+              description: titles[proposalId.toString()] ?? 'Governance proposal',
+              voteStart: 0n,
+              voteEnd: 0n,
+              state: stateMap.get(proposalId),
+            } satisfies ProposalFeedItem;
+          });
+      }
 
       setProposalPayloadById(payloadById);
       setProposalFeed(withState);
     } catch (e: unknown) {
-      setFeedErr(e instanceof Error ? e.message.split('\n')[0] : String(e));
+      const formatted = formatRpcFeedError(e);
+      setFeedErr(formatted);
+      pushFeedDiagnostic(`[Feed] ${formatted}`);
     } finally {
+      feedRefreshInFlight.current = false;
       setIsFeedLoading(false);
     }
   }
 
   useEffect(() => {
+    if (!hasPublicClient || !GOVERNOR) return;
     void refreshProposalFeed();
-  }, [publicClient, GOVERNOR]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hasPublicClient, GOVERNOR]);
 
   function recentProposalIdsFromLogs(
     logs: readonly { args: unknown; blockNumber?: bigint }[],
@@ -945,12 +1239,12 @@ export default function GovernancePage() {
     if (!publicClient || !GOVERNOR) return undefined;
     const latestBlock = await publicClient.getBlockNumber();
     const deepFromBlock = governanceLogsDeepFromBlock(latestBlock, TARGET_CHAIN_ID);
-    const deepCreatedLogs = await publicClient.getLogs({
+    const deepCreatedLogs = await getLogsWithSafeRange({
       address: GOVERNOR,
       event: proposalCreatedEvent,
       fromBlock: deepFromBlock,
       toBlock: 'latest',
-    });
+    }, latestBlock, { maxChunks: maxDeepLogChunks(TARGET_CHAIN_ID), maxDurationMs: preferredLogScanDurationMs(TARGET_CHAIN_ID) });
     const found = [...deepCreatedLogs].reverse().find((log) => {
       const args = log.args as ProposalCreatedArgs;
       return args.proposalId === id;
@@ -1196,7 +1490,7 @@ export default function GovernancePage() {
         {feedErr && <p className="text-xs text-ceitnot-danger mb-3">{feedErr}</p>}
         {proposalFeed.length === 0 ? (
           <p className="text-sm text-ceitnot-muted">
-            No proposals found in the last scan window (chain-specific block range + up to 90 days by time).
+            No proposals found in the last scan window (chain-specific block range).
             On fast L2s older UIs used a tiny block window — if this persists, confirm <code className="text-ceitnot-muted-2">VITE_GOVERNOR_ADDRESS</code> and check the Governor on the explorer.
           </p>
         ) : (

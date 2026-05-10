@@ -40,9 +40,10 @@ export const targetChain = chainFor(TARGET_CHAIN_ID);
 export const SUPPORTED_CHAIN_IDS = [targetChain.id] as const;
 
 const PUBLIC_ARBITRUM_RPCS = [
-  'https://arb1.arbitrum.io/rpc',
   'https://arbitrum-one.publicnode.com',
+  'https://1rpc.io/arb',
   'https://arbitrum.drpc.org',
+  'https://rpc.ankr.com/arbitrum',
 ] as const;
 
 const PUBLIC_SEPOLIA_RPCS = [
@@ -53,37 +54,105 @@ const PUBLIC_SEPOLIA_RPCS = [
 
 const PUBLIC_ARBITRUM_SEPOLIA_RPCS = [
   'https://sepolia-rollup.arbitrum.io/rpc',
-  'https://arbitrum-sepolia.publicnode.com',
+  'https://arbitrum-sepolia-rpc.publicnode.com',
+  'https://arbitrum-sepolia.drpc.org',
+  'https://endpoints.omniatech.io/v1/arbitrum/sepolia/public',
 ] as const;
 
 function validHttpUrl(s: string | undefined): string | undefined {
   const t = s?.trim();
-  if (t && /^https?:\/\//i.test(t)) return t;
+  const unquoted = t?.replace(/^['"]+|['"]+$/g, '').trim();
+  if (unquoted && /^https?:\/\//i.test(unquoted)) return unquoted;
   return undefined;
 }
 
-/**
- * Dev: `/rpc` → Vite proxy (see vite.config.ts), matches `VITE_CHAIN_ID`.
- * Prod: optional `VITE_ARBITRUM_RPC_URL` / `VITE_SEPOLIA_RPC_URL` / `VITE_ARBITRUM_SEPOLIA_RPC_URL`, else public fallbacks.
- */
+function uniqueUrls(urls: readonly (string | undefined)[]): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const url of urls) {
+    if (!url || seen.has(url)) continue;
+    seen.add(url);
+    out.push(url);
+  }
+  return out;
+}
+function isKnownCorsUnsafeRpc(url: string, chainId: number): boolean {
+  try {
+    const host = new URL(url).hostname.toLowerCase();
+    if (chainId === 42161 && host === 'arb1.arbitrum.io') return true;
+  } catch {
+    return false;
+  }
+  return false;
+}
+function isDeprioritizedRpc(url: string, chainId: number): boolean {
+  try {
+    const host = new URL(url).hostname.toLowerCase();
+    if (host.endsWith('infura.io') && (chainId === 42161 || chainId === 421614 || chainId === 11155111)) {
+      return true;
+    }
+  } catch {
+    return false;
+  }
+  return false;
+}
+
+function useDevRpcProxy(): boolean {
+  if (!import.meta.env.DEV) return false;
+  const raw = String(import.meta.env.VITE_USE_RPC_PROXY ?? '').trim().toLowerCase();
+  return raw === '1' || raw === 'true' || raw === 'yes';
+}
+
+function fallbackHttp(urls: readonly string[]) {
+  const transports = urls.map((url) => http(url, { retryCount: 0, timeout: 12_000 }));
+  if (transports.length === 1) return transports[0];
+  return fallback(transports);
+}
+function deriveArbitrumSepoliaRpc(rawArbitrumRpc: string | undefined): string | undefined {
+  if (!rawArbitrumRpc) return undefined;
+  try {
+    const u = new URL(rawArbitrumRpc);
+    if (u.hostname === 'arbitrum-sepolia.infura.io') return u.toString();
+    if (u.hostname === 'arbitrum-mainnet.infura.io') {
+      u.hostname = 'arbitrum-sepolia.infura.io';
+      return u.toString();
+    }
+  } catch {
+    return undefined;
+  }
+  return undefined;
+}
+
+function transportFromUrls(chainId: number, primaryCandidates: readonly (string | undefined)[], publicUrls: readonly string[]) {
+  const discoveredUrls = uniqueUrls([...primaryCandidates, ...publicUrls]).filter((url) => !isKnownCorsUnsafeRpc(url, chainId));
+  const prioritizedUrls = discoveredUrls.filter((url) => !isDeprioritizedRpc(url, chainId));
+  const deprioritizedUrls = discoveredUrls.filter((url) => isDeprioritizedRpc(url, chainId));
+  const allUrls = [...prioritizedUrls, ...deprioritizedUrls];
+  const withProxyFallback = useDevRpcProxy();
+  if (allUrls.length === 0) {
+    if (withProxyFallback) return fallbackHttp(['/rpc']);
+    return fallbackHttp([publicUrls[0]]);
+  }
+  if (withProxyFallback) {
+    return fallbackHttp([...allUrls, '/rpc']);
+  }
+  return fallbackHttp(allUrls);
+}
+
 function transportFor(chainId: number) {
   if (chainId === 42161) {
     const raw = validHttpUrl(import.meta.env.VITE_ARBITRUM_RPC_URL as string | undefined);
-    if (raw) return http(raw);
-    if (import.meta.env.DEV) return http('/rpc');
-    return fallback(PUBLIC_ARBITRUM_RPCS.map((url) => http(url)));
+    return transportFromUrls(chainId, [raw], PUBLIC_ARBITRUM_RPCS);
   }
   if (chainId === 421614) {
-    const raw = validHttpUrl(import.meta.env.VITE_ARBITRUM_SEPOLIA_RPC_URL as string | undefined);
-    if (raw) return http(raw);
-    if (import.meta.env.DEV) return http('/rpc');
-    return fallback(PUBLIC_ARBITRUM_SEPOLIA_RPCS.map((url) => http(url)));
+    const rawSepolia = validHttpUrl(import.meta.env.VITE_ARBITRUM_SEPOLIA_RPC_URL as string | undefined);
+    const rawArbitrum = validHttpUrl(import.meta.env.VITE_ARBITRUM_RPC_URL as string | undefined);
+    const derivedSepoliaFromArbitrum = deriveArbitrumSepoliaRpc(rawArbitrum);
+    return transportFromUrls(chainId, [rawSepolia, derivedSepoliaFromArbitrum], PUBLIC_ARBITRUM_SEPOLIA_RPCS);
   }
   if (chainId === 11155111) {
     const raw = validHttpUrl(import.meta.env.VITE_SEPOLIA_RPC_URL as string | undefined);
-    if (raw) return http(raw);
-    if (import.meta.env.DEV) return http('/rpc');
-    return fallback(PUBLIC_SEPOLIA_RPCS.map((url) => http(url)));
+    return transportFromUrls(chainId, [raw], PUBLIC_SEPOLIA_RPCS);
   }
   return http('http://127.0.0.1:8545');
 }

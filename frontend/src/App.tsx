@@ -16,7 +16,7 @@ import LightpaperPage from './pages/LightpaperPage';
 
 export default function App() {
   return (
-    <BrowserRouter>
+    <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
       <div className="min-h-screen flex flex-col">
         <Navbar />
         <WrongNetworkBanner />
